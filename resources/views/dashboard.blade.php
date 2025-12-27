@@ -236,7 +236,7 @@
             </div>
             <div class="card-body">
                 <div id="sales_funnel"
-                    data-colors='["--tb-primary", "--tb-success", "--tb-warning", "--tb-danger", "--tb-info"]'
+                    data-colors='["--tb-primary ", "--tb-success"]'
                     data-dump-histories="{{ $totalDumpHistories ?? 0 }}"
                     data-collection="{{ $totalCollections ?? 0 }}"
                     class="apex-charts" dir="ltr"></div>
