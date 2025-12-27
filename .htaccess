@@ -1,0 +1,24 @@
+# Options +SymLinksIfOwnerMatch
+# RewriteEngine On
+
+# # Allow Installatron requests
+# RewriteCond %{REQUEST_FILENAME} deleteme\.\w+\.php
+# RewriteRule (.*) - [L] 
+
+# RewriteRule ^ index.php [L]
+
+
+Options +SymLinksIfOwnerMatch
+RewriteEngine On
+
+# Allow Installatron requests
+RewriteCond %{REQUEST_FILENAME} deleteme\.\w+\.php
+RewriteRule (.*) - [L]
+
+# If the requested path is an existing file or directory, don't rewrite
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Otherwise send everything to root index.php (main project)
+RewriteRule ^ index.php [L]
