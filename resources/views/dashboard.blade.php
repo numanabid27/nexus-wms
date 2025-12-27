@@ -21,8 +21,8 @@
                         <i class="bi bi-activity"></i>
                     </div>
                 </div>
-                <p class="fs-md text-muted mb-4">Total Sessions</p>
-                <h4 class="mb-3"><span class="counter-value" data-target="154.79">0</span>k </h4>
+                <p class="fs-md text-muted mb-4">Total Çustomers</p>
+                <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalCustomers ?? 0 }}">0</span></h4>
                 <p class="text-success mb-0"><i class="bi bi-arrow-up me-1"></i> 06.41% Last Month</p>
             </div>
         </div>
@@ -36,8 +36,8 @@
                         <i class="bi bi-magnet"></i>
                     </div>
                 </div>
-                <p class="fs-md text-muted mb-4">Avg. Visit Duration</p>
-                <h4 class="mb-3"><span class="counter-value" data-target="01.57">0</span>sec </h4>
+                <p class="fs-md text-muted mb-4">Total Employes</p>
+                <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalEmployes ?? 0 }}">0</span></h4>
                 <p class="text-success mb-0"><i class="bi bi-arrow-up me-1"></i> 17.52% Last Month</p>
             </div>
         </div>
@@ -51,8 +51,8 @@
                         <i class="bi bi-optical-audio"></i>
                     </div>
                 </div>
-                <p class="fs-md text-muted mb-4">Impressions</p>
-                <h4 class="mb-3"><span class="counter-value" data-target="1784">0</span></h4>
+                <p class="fs-md text-muted mb-4">Total Vehicles</p>
+                <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalVehicles ?? 0 }}">0</span></h4>
                 <p class="text-danger mb-0"><i class="bi bi-arrow-down me-1"></i> 07.26% Last Week</p>
             </div>
         </div>
@@ -66,8 +66,8 @@
                         <i class="bi bi-eye"></i>
                     </div>
                 </div>
-                <p class="fs-md text-muted mb-4">Total Views</p>
-                <h4 class="mb-3"><span class="counter-value" data-target="136.19">0</span>k </h4>
+                <p class="fs-md text-muted mb-4">Total Collections</p>
+                <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalCollections ?? 0 }}">0</span></h4>
                 <p class="text-success mb-0"><i class="bi bi-arrow-up me-1"></i> 09.33% Last Month</p>
             </div>
         </div>
@@ -220,7 +220,7 @@
     <div class="col-xl-4 col-lg-6">
         <div class="card card-height-100">
             <div class="card-header d-flex">
-                <h5 class="card-title mb-0 flex-grow-1">Sales Funnel</h5>
+                <h5 class="card-title mb-0 flex-grow-1">Summery</h5>
                 <div class="flex-shrink-0">
                     <div class="dropdown card-header-dropdown">
                         <a class="text-reset dropdown-btn" href="#!" data-bs-toggle="dropdown"
@@ -237,6 +237,8 @@
             <div class="card-body">
                 <div id="sales_funnel"
                     data-colors='["--tb-primary", "--tb-success", "--tb-warning", "--tb-danger", "--tb-info"]'
+                    data-dump-histories="{{ $totalDumpHistories ?? 0 }}"
+                    data-collection="{{ $totalCollections ?? 0 }}"
                     class="apex-charts" dir="ltr"></div>
             </div>
         </div>
