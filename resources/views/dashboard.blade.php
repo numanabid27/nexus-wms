@@ -23,7 +23,6 @@
                 </div>
                 <p class="fs-md text-muted mb-4">Total Çustomers</p>
                 <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalCustomers ?? 0 }}">0</span></h4>
-                <p class="text-success mb-0"><i class="bi bi-arrow-up me-1"></i> 06.41% Last Month</p>
             </div>
         </div>
     </div>
@@ -38,7 +37,6 @@
                 </div>
                 <p class="fs-md text-muted mb-4">Total Employes</p>
                 <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalEmployes ?? 0 }}">0</span></h4>
-                <p class="text-success mb-0"><i class="bi bi-arrow-up me-1"></i> 17.52% Last Month</p>
             </div>
         </div>
     </div>
@@ -53,7 +51,6 @@
                 </div>
                 <p class="fs-md text-muted mb-4">Total Vehicles</p>
                 <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalVehicles ?? 0 }}">0</span></h4>
-                <p class="text-danger mb-0"><i class="bi bi-arrow-down me-1"></i> 07.26% Last Week</p>
             </div>
         </div>
     </div>
@@ -68,7 +65,6 @@
                 </div>
                 <p class="fs-md text-muted mb-4">Total Collections</p>
                 <h4 class="mb-3"><span class="counter-value" data-target="{{ $totalCollections ?? 0 }}">0</span></h4>
-                <p class="text-success mb-0"><i class="bi bi-arrow-up me-1"></i> 09.33% Last Month</p>
             </div>
         </div>
     </div>
@@ -80,15 +76,40 @@
     <div class="col-xl-9">
         <div class="card">
             <div class="card-header d-flex align-items-center flex-wrap gap-3">
-                <h5 class="card-title mb-0 flex-grow-1">Performance Overview</h5>
+                <h5 class="card-title mb-0 flex-grow-1">Collections</h5>
                 <div class="flex-shrink-0">
-                    <input type="text" class="form-control form-control-sm" data-provider="flatpickr"
-                        data-date-format="d M, Y" data-default-date="14 Jun 2022 to 16 Jun 2022" data-range-date="true">
+                    <div class="dropdown card-header-dropdown">
+                        <a class="text-reset dropdown-btn" href="#!" data-bs-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <span class="text-muted fs-lg"><i class="bi bi-three-dots-vertical"></i></span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end">
+                            @php
+                                $today = \Carbon\Carbon::today();
+                                $currentMonth = $today->month;
+                                $currentYear = $today->year;
+                                
+                                // Generate months (current month and previous months)
+                                $currentMonthStart = $today->copy()->startOfMonth();
+                                for ($i = 0; $i < 12; $i++) {
+                                    $month = $currentMonthStart->copy()->subMonths($i);
+                                    $monthLabel = $month->format('M Y');
+                                    $monthValue = $month->format('Y-m');
+                                    echo '<a class="dropdown-item collection-filter" href="#!" data-month="' . $monthValue . '">' . $monthLabel . '</a>';
+                                }
+                            @endphp
+                        </div>
+                    </div>
                 </div>
             </div>
             <!--end card-header-->
             <div class="card-body">
-                <div id="pageviews_overview" data-colors='["--tb-primary", "--tb-light"]' class="apex-charts ms-n3"
+                <div id="pageviews_overview" 
+                    data-collection="{{ $totalCollections ?? 0 }}" 
+                    data-chart-data="{{ json_encode($chartData ?? []) }}"
+                    data-chart-categories="{{ json_encode($chartCategories ?? []) }}"
+                    data-colors='["--tb-primary", "--tb-light"]' 
+                    class="apex-charts ms-n3"
                     dir="ltr"></div>
                 <div class="row mt-3 g-3">
                     <div class="col-md-4 col-sm-6">
@@ -228,8 +249,20 @@
                             <span class="text-muted fs-lg"><i class="bi bi-three-dots-vertical"></i></span>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="#!">This Years</a>
-                            <a class="dropdown-item" href="#!">Last Years</a>
+                            @php
+                                $today = \Carbon\Carbon::today();
+                                $currentMonth = $today->month;
+                                $currentYear = $today->year;
+                                
+                                // Generate months (current month and previous months)
+                                $currentMonthStart = $today->copy()->startOfMonth();
+                                for ($i = 0; $i < 12; $i++) {
+                                    $month = $currentMonthStart->copy()->subMonths($i);
+                                    $monthLabel = $month->format('M Y');
+                                    $monthValue = $month->format('Y-m');
+                                    echo '<a class="dropdown-item" href="#!" data-month="' . $monthValue . '">' . $monthLabel . '</a>';
+                                }
+                            @endphp
                         </div>
                     </div>
                 </div>
@@ -348,4 +381,251 @@
 
 <!-- dashboard-analytics init js -->
 <script src="{{ URL::asset('build/js/pages/dashboard-analytics.init.js') }}"></script>
+
+<script>
+(function() {
+    function initDumpHistoryFilter() {
+        // Find the Summery card
+        const cards = document.querySelectorAll('.card');
+        let summeryCard = null;
+        
+        for (let i = 0; i < cards.length; i++) {
+            const title = cards[i].querySelector('.card-title');
+            if (title && title.textContent.trim() === 'Summery') {
+                summeryCard = cards[i];
+                break;
+            }
+        }
+        
+        if (!summeryCard) {
+            return;
+        }
+        
+        const summeryDropdown = summeryCard.querySelector('.dropdown-menu');
+        if (!summeryDropdown) {
+            return;
+        }
+        
+        // Use event delegation on the dropdown
+        summeryDropdown.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const target = e.target.closest('.dropdown-item');
+            if (!target) return;
+            
+            const date = target.getAttribute('data-date');
+            const month = target.getAttribute('data-month');
+            
+            if (!date && !month) {
+                return;
+            }
+            
+            // Build the request URL using the same dashboard route
+            let url = '{{ route("dashboard") }}';
+            if (date) {
+                url += '?date=' + encodeURIComponent(date);
+            } else if (month) {
+                url += '?month=' + encodeURIComponent(month);
+            }
+            
+            // Update active state
+            summeryDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            target.classList.add('active');
+            
+            // Make AJAX request
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP error! status: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const salesFunnelElement = document.getElementById('sales_funnel');
+                if (!salesFunnelElement) {
+                    console.error('sales_funnel element not found');
+                    return;
+                }
+                
+                // Update both data attributes
+                const dumpCount = data.dumpCount || 0;
+                const collectionCount = data.collectionCount || 0;
+                
+                salesFunnelElement.setAttribute('data-dump-histories', dumpCount);
+                salesFunnelElement.setAttribute('data-collection', collectionCount);
+                
+                // Try to update the chart - check multiple ways to access it
+                let chart = null;
+                if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "") {
+                    chart = salesFunnelChart;
+                } else if (typeof window.salesFunnelChart !== 'undefined' && window.salesFunnelChart && window.salesFunnelChart !== "") {
+                    chart = window.salesFunnelChart;
+                }
+                
+                if (chart && typeof chart.updateSeries === 'function') {
+                    chart.updateSeries([dumpCount, collectionCount]);
+                } else {
+                    // Chart not ready, reload it
+                    if (typeof loadCharts === 'function') {
+                        loadCharts();
+                        // Try to update after a short delay
+                        setTimeout(function() {
+                            if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "" && typeof salesFunnelChart.updateSeries === 'function') {
+                                salesFunnelChart.updateSeries([dumpCount, collectionCount]);
+                            }
+                        }, 200);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching dump history count:', error);
+                target.classList.remove('active');
+            });
+        });
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initDumpHistoryFilter, 1000);
+        });
+    } else {
+        setTimeout(initDumpHistoryFilter, 1000);
+    }
+})();
+
+// Handle Collections dropdown filter
+(function() {
+    function initCollectionFilter() {
+        // Find the Collections card
+        const cards = document.querySelectorAll('.card');
+        let collectionsCard = null;
+        
+        for (let i = 0; i < cards.length; i++) {
+            const title = cards[i].querySelector('.card-title');
+            if (title && title.textContent.trim() === 'Collections') {
+                collectionsCard = cards[i];
+                break;
+            }
+        }
+        
+        if (!collectionsCard) {
+            return;
+        }
+        
+        const collectionDropdown = collectionsCard.querySelector('.dropdown-menu');
+        if (!collectionDropdown) {
+            return;
+        }
+        
+        // Use event delegation on the dropdown
+        collectionDropdown.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const target = e.target.closest('.collection-filter');
+            if (!target) return;
+            
+            const date = target.getAttribute('data-date');
+            const month = target.getAttribute('data-month');
+            
+            if (!date && !month) {
+                return;
+            }
+            
+            // Build the request URL
+            let url = '{{ route("dashboard") }}?collection_chart=1';
+            if (date) {
+                url += '&date=' + encodeURIComponent(date);
+            } else if (month) {
+                url += '&month=' + encodeURIComponent(month);
+            }
+            
+            // Update active state
+            collectionDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            target.classList.add('active');
+            
+            // Make AJAX request
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP error! status: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const pageViewsElement = document.getElementById('pageviews_overview');
+                if (!pageViewsElement) {
+                    console.error('pageviews_overview element not found');
+                    return;
+                }
+                
+                // Update data attributes
+                pageViewsElement.setAttribute('data-chart-data', JSON.stringify(data.series));
+                pageViewsElement.setAttribute('data-chart-categories', JSON.stringify(data.categories));
+                
+                // Update the chart
+                if (typeof pageViewsOverviewChart !== 'undefined' && pageViewsOverviewChart && pageViewsOverviewChart !== "") {
+                    pageViewsOverviewChart.updateOptions({
+                        series: [{
+                            name: 'Collection',
+                            data: data.series
+                        }],
+                        xaxis: {
+                            categories: data.categories
+                        }
+                    });
+                } else if (typeof window.pageViewsOverviewChart !== 'undefined' && window.pageViewsOverviewChart && window.pageViewsOverviewChart !== "") {
+                    window.pageViewsOverviewChart.updateOptions({
+                        series: [{
+                            name: 'Collection',
+                            data: data.series
+                        }],
+                        xaxis: {
+                            categories: data.categories
+                        }
+                    });
+                } else {
+                    // Chart not ready, reload it
+                    if (typeof loadCharts === 'function') {
+                        loadCharts();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching collection chart data:', error);
+                target.classList.remove('active');
+            });
+        });
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initCollectionFilter, 1000);
+        });
+    } else {
+        setTimeout(initCollectionFilter, 1000);
+    }
+})();
+</script>
 @endsection
