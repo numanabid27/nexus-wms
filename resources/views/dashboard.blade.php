@@ -717,20 +717,30 @@ function filterByDate(data, dateStr) {
 function filterByDateRange(data, startDate, endDate) {
     const filtered = {};
     
-    // Ensure dates are Date objects
+    // Ensure dates are Date objects and extract date components
     const start = new Date(startDate);
     const end = new Date(endDate);
     
-    // Set to start and end of day
-    start.setUTCHours(0, 0, 0, 0);
-    end.setUTCHours(23, 59, 59, 999);
+    // Get date components using local date methods
+    const startYear = start.getFullYear();
+    const startMonth = start.getMonth();
+    const startDay = start.getDate();
+    
+    const endYear = end.getFullYear();
+    const endMonth = end.getMonth();
+    const endDay = end.getDate();
+    
+    // Create date objects at midnight local time for comparison
+    const startDateLocal = new Date(startYear, startMonth, startDay, 0, 0, 0, 0);
+    const endDateLocal = new Date(endYear, endMonth, endDay, 23, 59, 59, 999);
     
     Object.keys(data).forEach(dateStr => {
-        // Parse date string as UTC
+        // Parse date string (YYYY-MM-DD format from server)
         const [y, m, d] = dateStr.split('-').map(Number);
-        const date = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+        // Create date at midnight local time for comparison
+        const date = new Date(y, m - 1, d, 0, 0, 0, 0);
         
-        if (date >= start && date <= end) {
+        if (date >= startDateLocal && date <= endDateLocal) {
             filtered[dateStr] = data[dateStr];
         }
     });
@@ -747,42 +757,55 @@ function generateChartData(data, startDate, endDate) {
     let datesToShow = [];
     
     if (startDate && endDate) {
-        // Use the provided date range
+        // Use the provided date range - extract year, month, day to avoid timezone issues
         const start = new Date(startDate);
-        start.setUTCHours(0, 0, 0, 0);
         const end = new Date(endDate);
-        end.setUTCHours(23, 59, 59, 999);
         
-        // Generate all dates in the range
-        const current = new Date(start);
-        while (current <= end) {
-            datesToShow.push(new Date(current));
-            current.setUTCDate(current.getUTCDate() + 1);
+        // Get date components using local date methods to match what user selected
+        const startYear = start.getFullYear();
+        const startMonth = start.getMonth();
+        const startDay = start.getDate();
+        
+        const endYear = end.getFullYear();
+        const endMonth = end.getMonth();
+        const endDay = end.getDate();
+        
+        // Create date objects at midnight local time
+        const startDateLocal = new Date(startYear, startMonth, startDay, 0, 0, 0, 0);
+        const endDateLocal = new Date(endYear, endMonth, endDay, 0, 0, 0, 0);
+        
+        // Calculate the number of days between start and end (inclusive)
+        const daysDiff = Math.ceil((endDateLocal - startDateLocal) / (1000 * 60 * 60 * 24)) + 1;
+        
+        // Generate all dates in the range (inclusive of both start and end)
+        for (let i = 0; i < daysDiff; i++) {
+            const date = new Date(startYear, startMonth, startDay + i, 0, 0, 0, 0);
+            datesToShow.push(date);
         }
     } else {
         // Fall back to last 15 days from today (for backward compatibility)
         const today = new Date();
-        today.setUTCHours(23, 59, 59, 999);
+        today.setHours(23, 59, 59, 999);
         
         for (let i = 0; i < 15; i++) {
             const date = new Date(today);
-            date.setUTCDate(date.getUTCDate() - i);
-            date.setUTCHours(0, 0, 0, 0);
+            date.setDate(date.getDate() - i);
+            date.setHours(0, 0, 0, 0);
             datesToShow.unshift(date); // Add to beginning to show oldest first
         }
     }
     
     // Process dates from oldest to newest
     datesToShow.forEach(current => {
-        // Format date as YYYY-MM-DD using UTC
-        const year = current.getUTCFullYear();
-        const month = String(current.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(current.getUTCDate()).padStart(2, '0');
+        // Format date as YYYY-MM-DD using local date methods
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const day = String(current.getDate()).padStart(2, '0');
         const dateStr = `${year}-${month}-${day}`;
         
         // Format day without leading zero (1, 3, 5, etc.)
-        const dayNum = current.getUTCDate();
-        const monthName = monthNames[current.getUTCMonth()];
+        const dayNum = current.getDate();
+        const monthName = monthNames[current.getMonth()];
         
         chartCategories.push(dayNum + ' ' + monthName);
         chartData.push(data[dateStr] || 0);
