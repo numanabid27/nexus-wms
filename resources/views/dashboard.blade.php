@@ -146,117 +146,72 @@
     </div>
     <!--end col-->
     <div class="col-xl-4 col-lg-6">
-        <div class="card card-height-100">
+        <div class="card card-height-100" style="height: 40vh;">
             <div class="card-header d-flex">
-                <h5 class="card-title mb-0 flex-grow-1">Audience Sessions by Country</h5>
-                <div class="flex-shrink-0">
-                    <div class="dropdown card-header-dropdown">
-                        <a class="text-reset dropdown-btn" href="#!" data-bs-toggle="dropdown"
-                            aria-haspopup="true" aria-expanded="false">
-                            <span class="text-muted fs-lg"><i class="bi bi-three-dots-vertical"></i></span>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="#!">Current Years</a>
-                            <a class="dropdown-item" href="#!">Last Years</a>
-                        </div>
-                    </div>
-                </div>
+                <h5 class="card-title mb-0 flex-grow-1">Top Drivers</h5>
             </div>
             <div class="card-body">
-                <div id="session_country" data-colors='["--tb-primary", "--tb-card-bg"]' class="apex-charts ms-n3"
-                    dir="ltr"></div>
+                @if(isset($topDrivers) && $topDrivers->count() > 0)
+                    <ul class="list-unstyled vstack gap-2 mb-0">
+                        @foreach($topDrivers as $index => $helper)
+                            <li class="d-flex align-items-center gap-2">
+                                @if(!empty($helper['image_guid']))
+                                    <img src="{{ asset($helper['image_guid']) }}" alt="{{ $helper['name'] }}" height="32" width="32"
+                                        class="rounded-circle object-fit-cover">
+                                @else
+                                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: 600;">
+                                        {{ strtoupper(substr($helper['name'], 0, 1)) }}
+                                    </div>
+                                @endif
+                                <h6 class="flex-grow-1 mb-0">{{ $helper['name'] }}</h6>
+                                <p class="text-muted mb-0">{{ $helper['count'] }}</p>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <div class="text-center text-muted py-4">
+                        <p class="mb-0">No helper data available</p>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
     <!--end col-->
-    <div class="col-xl-4">
-        <div class="card card-height-100">
+    <div class="col-xl-4 col-lg-6">
+        <div class="card card-height-100" style="height: 40vh;">
             <div class="card-header d-flex">
-                <h5 class="card-title mb-0 flex-grow-1">Traffic Channel</h5>
-                <div class="flex-shrink-0">
-                    <div class="dropdown card-header-dropdown">
-                        <a class="text-reset dropdown-btn" href="#!" data-bs-toggle="dropdown"
-                            aria-haspopup="true" aria-expanded="false">
-                            <span class="text-muted fs-lg"><i class="bi bi-three-dots-vertical"></i></span>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="#!">Current Years</a>
-                            <a class="dropdown-item" href="#!">Last Years</a>
-                        </div>
-                    </div>
-                </div>
+                <h5 class="card-title mb-0 flex-grow-1">Top Helpers</h5>
             </div>
             <div class="card-body">
-                <div id="simple_bubble" data-colors='["--tb-primary", "--tb-info"]' class="apex-charts ms-n3"
-                    dir="ltr"></div>
+                @if(isset($topHelpers) && $topHelpers->count() > 0)
+                    <ul class="list-unstyled vstack gap-2 mb-0">
+                        @foreach($topHelpers as $index => $helper)
+                            <li class="d-flex align-items-center gap-2">
+                                @if(!empty($helper['image_guid']))
+                                    <img src="{{ asset($helper['image_guid']) }}" alt="{{ $helper['name'] }}" height="32" width="32"
+                                        class="rounded-circle object-fit-cover">
+                                @else
+                                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 14px; font-weight: 600;">
+                                        {{ strtoupper(substr($helper['name'], 0, 1)) }}
+                                    </div>
+                                @endif
+                                <h6 class="flex-grow-1 mb-0">{{ $helper['name'] }}</h6>
+                                <p class="text-muted mb-0">{{ $helper['count'] }}</p>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <div class="text-center text-muted py-4">
+                        <p class="mb-0">No helper data available</p>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
     <!--end col-->
    
     <!--end col-->
-    <div class="col-xl-4 col-lg-6">
-        <div class="card card-height-100">
-            <div class="card-header d-flex">
-                <h5 class="card-title mb-0 flex-grow-1">Top Helpers</h5>
-                <div class="flex-shrink-0">
-                    <div class="dropdown card-header-dropdown">
-                        <a class="text-reset dropdown-btn" href="#!" data-bs-toggle="dropdown"
-                            aria-haspopup="true" aria-expanded="false">
-                            <span class="text-muted fs-lg"><i class="bi bi-three-dots-vertical"></i></span>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="#!">This Years</a>
-                            <a class="dropdown-item" href="#!">Last Years</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body">
-                
-                <ul class="list-unstyled vstack gap-2 mb-0">
-                    <li class="d-flex align-items-center gap-2">
-                        <img src="https://img.themesbrand.com/judia/flags/us.svg" alt="" height="16"
-                            class="rounded-circle object-fit-cover">
-                        <h6 class="flex-grow-1 mb-0">United States</h6>
-                        <p class="text-muted mb-0">39.41%</p>
-                    </li>
-                    <li class="d-flex align-items-center gap-2">
-                        <img src="https://img.themesbrand.com/judia/flags/de.svg" alt="" height="16"
-                            class="rounded-circle object-fit-cover">
-                        <h6 class="flex-grow-1 mb-0">Germany</h6>
-                        <p class="text-muted mb-0">16.84%</p>
-                    </li>
-                    <li class="d-flex align-items-center gap-2">
-                        <img src="https://img.themesbrand.com/judia/flags/fr.svg" alt="" height="16"
-                            class="rounded-circle object-fit-cover">
-                        <h6 class="flex-grow-1 mb-0">France</h6>
-                        <p class="text-muted mb-0">12.54%</p>
-                    </li>
-                    <li class="d-flex align-items-center gap-2">
-                        <img src="https://img.themesbrand.com/judia/flags/ru.svg" alt="" height="16"
-                            class="rounded-circle object-fit-cover">
-                        <h6 class="flex-grow-1 mb-0">Russia</h6>
-                        <p class="text-muted mb-0">11.13%</p>
-                    </li>
-                    <li class="d-flex align-items-center gap-2">
-                        <img src="https://img.themesbrand.com/judia/flags/br.svg" alt="" height="16"
-                            class="rounded-circle object-fit-cover">
-                        <h6 class="flex-grow-1 mb-0">Brazil</h6>
-                        <p class="text-muted mb-0">9.17%</p>
-                    </li>
-                    <li class="d-flex align-items-center gap-2">
-                        <img src="https://img.themesbrand.com/judia/flags/se.svg" alt="" height="16"
-                            class="rounded-circle object-fit-cover">
-                        <h6 class="flex-grow-1 mb-0">Sweden</h6>
-                        <p class="text-muted mb-0">1.25%</p>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    <!--end col-->
-    <div class="col-xl-5 col-lg-6">
+    {{-- <div class="col-xl-5 col-lg-6">
         <div class="card card-height-100">
             <div class="card-header d-flex align-items-center">
                 <h5 class="card-title mb-0 flex-grow-1">Sales Report</h5>
@@ -270,9 +225,9 @@
                     dir="ltr"></div>
             </div>
         </div>
-    </div>
+    </div> --}}
     <!--end col-->
-    <div class="col-xl-3 col-lg-6">
+    {{-- <div class="col-xl-3 col-lg-6">
         <div class="card text-center">
             <div class="card-body">
                 <h5 class="card-title mb-2">Your team Performance this week</h5>
@@ -281,7 +236,7 @@
                 <button class="btn btn-info">View Details</button>
             </div>
         </div>
-    </div>
+    </div> --}}
     <!--end col-->
 </div>
 <!--end row-->
@@ -606,13 +561,13 @@ let dashboardData = {
         }
         
         // Use the same logic as resetCollectionsChart() to ensure consistency
-        // Reset to last 15 days from today
+        // Reset to last 15 days from today (using local time to avoid timezone issues)
         const today = new Date();
-        today.setUTCHours(23, 59, 59, 999);
+        today.setHours(23, 59, 59, 999);
         const endDate = new Date(today);
         const startDate = new Date(today);
-        startDate.setUTCDate(startDate.getUTCDate() - 14); // 15 days total (today + 14 previous days)
-        startDate.setUTCHours(0, 0, 0, 0);
+        startDate.setDate(startDate.getDate() - 14); // 15 days total (today + 14 previous days)
+        startDate.setHours(0, 0, 0, 0);
         
         // Filter collections for the date range
         const filteredCollections = filterByDateRange(dashboardData.collections, startDate, endDate);
@@ -1067,13 +1022,13 @@ function getCountForDateRange(data, startDate, endDate) {
     }
     
     function resetCollectionsChart() {
-        // Reset to last 15 days from today
+        // Reset to last 15 days from today (using local time to avoid timezone issues)
         const today = new Date();
-        today.setUTCHours(23, 59, 59, 999);
+        today.setHours(23, 59, 59, 999);
         const endDate = new Date(today);
         const startDate = new Date(today);
-        startDate.setUTCDate(startDate.getUTCDate() - 14); // 15 days total (today + 14 previous days)
-        startDate.setUTCHours(0, 0, 0, 0);
+        startDate.setDate(startDate.getDate() - 14);
+        startDate.setHours(0, 0, 0, 0);
         
         // Filter collections for the date range
         const filteredCollections = filterByDateRange(dashboardData.collections, startDate, endDate);
