@@ -32,16 +32,17 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $companyId = Auth::user()->company_id;
-
-        // Handle AJAX request for all data (filtering done in JavaScript)
+        // $name = Auth::user()->name;
+        // dd($name);
+        
         if ($request->ajax() && $request->has('get_all_data')) {
             // Get all collection data grouped by date (last 12 months)
             $startDate = Carbon::today()->subMonths(12)->startOfMonth();
             $endDate = Carbon::today()->endOfDay();
             
             $collections = Collection::where('company_id', $companyId)
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->whereBetween('pickup_date', [$startDate, $endDate])
+                ->selectRaw('DATE(pickup_date) as date, COUNT(*) as count')
                 ->groupBy('date')
                 ->orderBy('date', 'asc')
                 ->get()
@@ -50,8 +51,8 @@ class DashboardController extends Controller
                 });
             // Get all dump history and collection counts grouped by date
             $dumpHistories = DumpHistory::where('company_id', $companyId)
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->whereBetween('dump_date', [$startDate, $endDate])
+                ->selectRaw('DATE(dump_date) as date, COUNT(*) as count')
                 ->groupBy('date')
                 ->orderBy('date', 'asc')
                 ->get()
@@ -60,8 +61,8 @@ class DashboardController extends Controller
                 });
             
             $collectionCounts = Collection::where('company_id', $companyId)
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->whereBetween('pickup_date', [$startDate, $endDate])
+                ->selectRaw('DATE(pickup_date) as date, COUNT(*) as count')
                 ->groupBy('date')
                 ->orderBy('date', 'asc')
                 ->get()
@@ -79,7 +80,7 @@ class DashboardController extends Controller
         $totalEmployes = User::where('company_id', $companyId)->count();
         $totalVehicles = Vehicle::where('company_id', $companyId)->count();
         $totalCustomers = Customer::where('company_id', $companyId)->count();
-
+        // dd($totalEmployes);
         $today = Carbon::today();
         
         // Summary totals: Show current month
@@ -87,11 +88,11 @@ class DashboardController extends Controller
         $monthEndDate = $today->copy()->endOfMonth()->endOfDay();
         
         $totalDumpHistories = DumpHistory::where('company_id', $companyId)
-            ->whereBetween('created_at', [$monthStartDate, $monthEndDate])
+            ->whereBetween('dump_date', [$monthStartDate, $monthEndDate])
             ->count();
         
         $totalCollections = Collection::where('company_id', $companyId)
-            ->whereBetween('created_at', [$monthStartDate, $monthEndDate])
+            ->whereBetween('pickup_date', [$monthStartDate, $monthEndDate])
             ->count();
         
         // Chart data: Default to last 15 days
@@ -100,8 +101,8 @@ class DashboardController extends Controller
         
         // Get collection data for chart (last 15 days)
         $collections = Collection::where('company_id', $companyId)
-            ->whereBetween('created_at', [$chartStartDate, $chartEndDate])
-            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+            ->whereBetween('pickup_date', [$chartStartDate, $chartEndDate])
+            ->selectRaw('DATE(pickup_date) as date, COUNT(*) as count')
             ->groupBy('date')
             ->orderBy('date', 'asc')
             ->get();

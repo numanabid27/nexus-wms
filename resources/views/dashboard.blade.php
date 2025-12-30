@@ -99,7 +99,7 @@
             </div>
             <!--end card-header-->
             <div class="card-body">
-                <div style="margin-top: 42px;" id="pageviews_overview" 
+                <div style="margin-top: 42px; min-width: 100%;" id="pageviews_overview" 
                     data-collection="{{ $totalCollections ?? 0 }}" 
                     data-chart-data="{{ json_encode($chartData ?? []) }}"
                     data-chart-categories="{{ json_encode($chartCategories ?? []) }}"
@@ -198,7 +198,7 @@
     <div class="col-xl-4 col-lg-6">
         <div class="card card-height-100">
             <div class="card-header d-flex">
-                <h5 class="card-title mb-0 flex-grow-1">Top Country</h5>
+                <h5 class="card-title mb-0 flex-grow-1">Top Helpers</h5>
                 <div class="flex-shrink-0">
                     <div class="dropdown card-header-dropdown">
                         <a class="text-reset dropdown-btn" href="#!" data-bs-toggle="dropdown"
@@ -213,11 +213,7 @@
                 </div>
             </div>
             <div class="card-body">
-                <div class="p-3 text-center bg-light bg-opacity-50 mb-4 rounded">
-                    <h4 class="mb-0">$<span class="counter-value" data-target="314.57">0</span>M <span
-                            class="text-muted fw-normal fs-sm"><span class="text-success fw-medium"><i
-                                    class="bi bi-arrow-up"></i> +23.57%</span> Last Month</span></h4>
-                </div>
+                
                 <ul class="list-unstyled vstack gap-2 mb-0">
                     <li class="d-flex align-items-center gap-2">
                         <img src="https://img.themesbrand.com/judia/flags/us.svg" alt="" height="16"
@@ -358,8 +354,17 @@
                         const startDate = selectedDates[0];
                         const endDate = selectedDates[1];
                         
-                        // Calculate days difference
-                        const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                        // Calculate days difference using date components for accuracy
+                        const startYear = startDate.getFullYear();
+                        const startMonth = startDate.getMonth();
+                        const startDay = startDate.getDate();
+                        const endYear = endDate.getFullYear();
+                        const endMonth = endDate.getMonth();
+                        const endDay = endDate.getDate();
+                        
+                        const startDateOnly = new Date(startYear, startMonth, startDay);
+                        const endDateOnly = new Date(endYear, endMonth, endDay);
+                        const daysDiff = Math.round((endDateOnly - startDateOnly) / (1000 * 60 * 60 * 24)) + 1;
                         
                         // Check if range exceeds 15 days
                         if (daysDiff > 15) {
@@ -773,17 +778,27 @@ function generateChartData(data, startDate, endDate) {
         const endMonth = end.getMonth();
         const endDay = end.getDate();
         
-        // Create date objects at midnight local time
+        // Create date objects at midnight local time for start
         const startDateLocal = new Date(startYear, startMonth, startDay, 0, 0, 0, 0);
-        const endDateLocal = new Date(endYear, endMonth, endDay, 0, 0, 0, 0);
+        // Create end date at end of day to ensure the last day is included
+        const endDateLocal = new Date(endYear, endMonth, endDay, 23, 59, 59, 999);
         
         // Calculate the number of days between start and end (inclusive)
-        const daysDiff = Math.ceil((endDateLocal - startDateLocal) / (1000 * 60 * 60 * 24)) + 1;
+        // Use date components directly for accurate calculation
+        const startDateOnly = new Date(startYear, startMonth, startDay);
+        const endDateOnly = new Date(endYear, endMonth, endDay);
+        const daysDiff = Math.round((endDateOnly - startDateOnly) / (1000 * 60 * 60 * 24)) + 1;
         
         // Generate all dates in the range (inclusive of both start and end)
+        // Use a more reliable method: iterate from start to end date
+        // Calculate the exact number of days to ensure we get exactly 15 days when range is 15 days
+        const currentDate = new Date(startDateLocal);
+        const endDateForLoop = new Date(endYear, endMonth, endDay, 0, 0, 0, 0);
+        
+        // Use daysDiff to ensure we generate exactly the right number of days
         for (let i = 0; i < daysDiff; i++) {
-            const date = new Date(startYear, startMonth, startDay + i, 0, 0, 0, 0);
-            datesToShow.push(date);
+            const dateToAdd = new Date(startYear, startMonth, startDay + i, 0, 0, 0, 0);
+            datesToShow.push(dateToAdd);
         }
     } else {
         // Fall back to last 15 days from today (for backward compatibility)
@@ -888,8 +903,17 @@ function getCountForDateRange(data, startDate, endDate) {
                         const startDate = selectedDates[0];
                         const endDate = selectedDates[1];
                         
-                        // Calculate days difference
-                        const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                        // Calculate days difference using date components for accuracy
+                        const startYear = startDate.getFullYear();
+                        const startMonth = startDate.getMonth();
+                        const startDay = startDate.getDate();
+                        const endYear = endDate.getFullYear();
+                        const endMonth = endDate.getMonth();
+                        const endDay = endDate.getDate();
+                        
+                        const startDateOnly = new Date(startYear, startMonth, startDay);
+                        const endDateOnly = new Date(endYear, endMonth, endDay);
+                        const daysDiff = Math.round((endDateOnly - startDateOnly) / (1000 * 60 * 60 * 24)) + 1;
                         
                         // Check if range exceeds 15 days
                         if (daysDiff > 15) {
