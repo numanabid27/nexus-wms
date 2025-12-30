@@ -593,7 +593,15 @@ let dashboardData = {
             return;
         }
         
-        // Default: Show last 15 days from today
+        // Check if data is loaded
+        if (!dashboardData.collections || Object.keys(dashboardData.collections).length === 0) {
+            // Data not loaded yet, wait a bit and try again
+            setTimeout(initializeCurrentMonthChart, 200);
+            return;
+        }
+        
+        // Use the same logic as resetCollectionsChart() to ensure consistency
+        // Reset to last 15 days from today
         const today = new Date();
         today.setUTCHours(23, 59, 59, 999);
         const endDate = new Date(today);
@@ -616,13 +624,7 @@ let dashboardData = {
         pageViewsElement.setAttribute('data-chart-data', JSON.stringify(chartData.series));
         pageViewsElement.setAttribute('data-chart-categories', JSON.stringify(chartData.categories));
         
-        // Mark current month as active in dropdown
-        const collectionDropdown = document.querySelector('.collection-filter[data-month="' + currentMonth + '"]');
-        if (collectionDropdown) {
-            collectionDropdown.classList.add('active');
-        }
-        
-        // Update chart if it exists - check if update is needed
+        // Update chart if it exists - use the same update logic as resetCollectionsChart
         const chart = (typeof pageViewsOverviewChart !== 'undefined' && pageViewsOverviewChart && pageViewsOverviewChart !== "") 
             ? pageViewsOverviewChart 
             : (typeof window.pageViewsOverviewChart !== 'undefined' && window.pageViewsOverviewChart && window.pageViewsOverviewChart !== "") 
@@ -631,59 +633,60 @@ let dashboardData = {
         
         if (chart) {
             try {
-                // Check if data is different before updating
-                const currentSeries = chart.w.globals.series[0].data || [];
-                const currentCategories = chart.w.globals.categoryLabels || [];
+                chartUpdateInProgress = true;
+                chart.updateOptions({
+                    series: [{
+                        name: 'Collection',
+                        data: chartData.series
+                    }],
+                    xaxis: {
+                        categories: chartData.categories
+                    }
+                }, false, true); // false = no animation, true = sync update
                 
-                const dataChanged = JSON.stringify(currentSeries) !== JSON.stringify(chartData.series);
-                const categoriesChanged = JSON.stringify(currentCategories) !== JSON.stringify(chartData.categories);
-                
-                if (dataChanged || categoriesChanged) {
-                    chartUpdateInProgress = true;
-                    chart.updateOptions({
-                        series: [{
-                            name: 'Collection',
-                            data: chartData.series
-                        }],
-                        xaxis: {
-                            categories: chartData.categories
-                        }
-                    }, false, true); // false = no animation, true = sync update
-                    
-                    // Reset flag after a short delay
-                    setTimeout(() => {
-                        chartUpdateInProgress = false;
-                    }, 100);
-                }
+                // Reset flag after a short delay
+                setTimeout(() => {
+                    chartUpdateInProgress = false;
+                }, 100);
             } catch (e) {
                 // Chart might not be fully initialized, try again later
                 console.warn('Chart update failed, will retry:', e);
                 chartUpdateInProgress = false;
+                setTimeout(initializeCurrentMonthChart, 300);
             }
+        } else {
+            // Chart not ready, wait and try again
+            setTimeout(initializeCurrentMonthChart, 200);
         }
     }
     
-    // Wait for chart to be ready before updating
+    // Wait for both data and chart to be ready before updating
     function waitForChartAndUpdate() {
-        if (typeof pageViewsOverviewChart !== 'undefined' && pageViewsOverviewChart && pageViewsOverviewChart !== "") {
-            initializeCurrentMonthChart();
-        } else if (typeof window.pageViewsOverviewChart !== 'undefined' && window.pageViewsOverviewChart && window.pageViewsOverviewChart !== "") {
+        // Check if data is loaded
+        const dataReady = dashboardData.collections && Object.keys(dashboardData.collections).length > 0;
+        
+        // Check if chart is ready
+        const chartReady = (typeof pageViewsOverviewChart !== 'undefined' && pageViewsOverviewChart && pageViewsOverviewChart !== "") ||
+                          (typeof window.pageViewsOverviewChart !== 'undefined' && window.pageViewsOverviewChart && window.pageViewsOverviewChart !== "");
+        
+        if (dataReady && chartReady) {
+            // Both ready, initialize chart
             initializeCurrentMonthChart();
         } else {
-            // Chart not ready yet, check again
-            setTimeout(waitForChartAndUpdate, 100);
+            // Not ready yet, check again
+            setTimeout(waitForChartAndUpdate, 200);
         }
     }
     
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             fetchAllData();
-            // Wait for chart to initialize, then update it
-            setTimeout(waitForChartAndUpdate, 300);
+            // Wait for both data and chart to be ready
+            setTimeout(waitForChartAndUpdate, 500);
         });
     } else {
         fetchAllData();
-        setTimeout(waitForChartAndUpdate, 300);
+        setTimeout(waitForChartAndUpdate, 500);
     }
 })();
 
