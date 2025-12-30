@@ -125,62 +125,62 @@ class DashboardController extends Controller
         // Pass current month for JavaScript
         $currentMonth = $today->format('Y-m');
         
-        // top drivers
-        $topDrivers = User::where('company_id', $companyId)
-            ->where('is_deleted', 0)
-            ->whereHas('roles', function ($query) {
-                $query->where('name', 'Driver');
-            })
+        // Top drivers
+        $topDrivers = User::select('users.id', 'users.name', 'users.image_guid')
+            ->selectRaw('COUNT(collections.id) as collection_count')
+            ->join('collections', 'collections.driver_id', '=', 'users.id')
+            ->join('model_has_roles', 'model_has_roles.model_id', '=', 'users.id')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('users.company_id', $companyId)
+            ->where('users.is_deleted', 0)
+            ->where('collections.company_id', $companyId)
+            ->whereNotNull('collections.driver_id')
+            ->where('roles.name', 'Driver')
+            ->where('model_has_roles.model_type', User::class)
+            ->groupBy('users.id', 'users.name', 'users.image_guid')
+            ->having('collection_count', '>', 0)
+            ->orderByDesc('collection_count')
+            ->limit(10)
             ->get()
-            ->map(function ($user) use ($companyId) {
-                $collectionCount = Collection::where('company_id', $companyId)
-                    ->whereNotNull('driver_id')
-                    ->whereRaw("FIND_IN_SET(?, driver_id)", [$user->id])
-                    ->count();
-                
+            ->map(function ($user) {
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'image_guid' => $user->image_guid,
-                    'count' => $collectionCount
+                    'count' => (int)$user->collection_count
                 ];
             })
-            ->filter(function ($helper) {
-                return $helper['count'] > 0; 
-            })
-            ->sortByDesc('count')
-            ->take(10)
             ->values();
- 
-        // top helpers
-        $topHelpers = User::where('company_id', $companyId)
-            ->where('is_deleted', 0)
-            ->whereHas('roles', function ($query) {
-                $query->where('name', 'Helper');
+            
+        // Top drivers
+        $topHelpers = User::select('users.id', 'users.name', 'users.image_guid')
+            ->selectRaw('COUNT(collections.id) as collection_count')
+            ->join('collections', function($join) {
+                $join->whereNotNull('collections.helper_ids')
+                    ->whereRaw('FIND_IN_SET(users.id, collections.helper_ids)');
             })
+            ->join('model_has_roles', 'model_has_roles.model_id', '=', 'users.id')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('users.company_id', $companyId)
+            ->where('users.is_deleted', 0)
+            ->where('collections.company_id', $companyId)
+            ->where('roles.name', 'Helper')
+            ->where('model_has_roles.model_type', User::class)
+            ->groupBy('users.id', 'users.name', 'users.image_guid')
+            ->having('collection_count', '>', 0)
+            ->orderByDesc('collection_count')
+            ->limit(10)
             ->get()
-            ->map(function ($user) use ($companyId) {
-                $collectionCount = Collection::where('company_id', $companyId)
-                    ->whereNotNull('helper_ids')
-                    ->whereRaw("FIND_IN_SET(?, helper_ids)", [$user->id])
-                    ->count();
-                
+            ->map(function ($user) {
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
                     'image_guid' => $user->image_guid,
-                    'count' => $collectionCount
+                    'count' => (int)$user->collection_count
                 ];
             })
-            ->filter(function ($helper) {
-                return $helper['count'] > 0; 
-            })
-            ->sortByDesc('count')
-            ->take(10)
             ->values();
 
-
-        
         
         return view('dashboard', compact('totalCollections', 'totalEmployes', 'totalVehicles','totalCustomers', 'totalDumpHistories', 'chartData', 'chartCategories', 'currentMonth', 'topDrivers', 'topHelpers'));
     }

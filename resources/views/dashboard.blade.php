@@ -170,7 +170,7 @@
                     </ul>
                 @else
                     <div class="text-center text-muted py-4">
-                        <p class="mb-0">No helper data available</p>
+                        <p class="mb-0">No driver data available</p>
                     </div>
                 @endif
             </div>
