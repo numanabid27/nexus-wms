@@ -163,8 +163,10 @@
                             <div class="mb-2">
                                 <label class="form-label small text-muted mb-1">{{ __('range') }}:</label>
                                 <div class="position-relative">
-                                    {!! Form::text('billing_chart_date_range', null, array('placeholder' => __('range'),'class' => 'form-control flatpickr-input', 'id' => 'billing_chart_date_range', 'readonly'=>"readonly")) !!}
-                                    <button type="button" class="btn btn-link text-muted p-0 position-absolute end-0 top-50 translate-middle-y me-2" id="clear_billing_chart_date" style="display: none; z-index: 10; border: none; background: none; font-size: 1.2rem; line-height: 1;" title="Clear date">
+                                    <select class="form-control" id="billing_chart_date_range" name="billing_chart_date_range">
+                                        <option value="">{{ __('Select Year') }}</option>
+                                    </select>
+                                    <button type="button" class="btn btn-link text-muted p-0 position-absolute end-0 top-50 translate-middle-y me-2" id="clear_billing_chart_date" style="display: none; z-index: 10; border: none; background: none; font-size: 1.2rem; line-height: 1;" title="Clear year">
                                         <i class="bi bi-x-circle"></i>
                                     </button>
                                 </div>
@@ -1473,15 +1475,9 @@ function generateChartData(data, startDate, endDate) {
         // Create end date at end of day to ensure the last day is included
         const endDateLocal = new Date(endYear, endMonth, endDay, 23, 59, 59, 999);
         
-        // Calculate the number of days between start and end (inclusive)
-        // Use date components directly for accurate calculation
         const startDateOnly = new Date(startYear, startMonth, startDay);
         const endDateOnly = new Date(endYear, endMonth, endDay);
         const daysDiff = Math.round((endDateOnly - startDateOnly) / (1000 * 60 * 60 * 24)) + 1;
-        
-        // Generate all dates in the range (inclusive of both start and end)
-        // Use a more reliable method: iterate from start to end date
-        // Calculate the exact number of days to ensure we get exactly 15 days when range is 15 days
         const currentDate = new Date(startDateLocal);
         const endDateForLoop = new Date(endYear, endMonth, endDay, 0, 0, 0, 0);
         
@@ -2393,8 +2389,8 @@ function getCountForDateRange(data, startDate, endDate) {
     var billingChartGroupbar = "";
     
     function initBillingChartDatePicker() {
-        const dateRangeInput = document.getElementById('billing_chart_date_range');
-        if (!dateRangeInput) {
+        const yearSelect = document.getElementById('billing_chart_date_range');
+        if (!yearSelect) {
             return;
         }
         
@@ -2414,115 +2410,67 @@ function getCountForDateRange(data, startDate, endDate) {
             return;
         }
         
-        const dropdownBtn = billingChartCard.querySelector('.dropdown-btn');
         const dropdownMenu = billingChartCard.querySelector('.dropdown-menu');
-        
-        // Destroy any existing flatpickr instance
-        if (dateRangeInput._flatpickr) {
-            dateRangeInput._flatpickr.destroy();
-        }
         
         // Get clear button
         const clearBtn = document.getElementById('clear_billing_chart_date');
         
-        // Initialize flatpickr
-        if (typeof flatpickr !== 'undefined') {
-            billingChartDatePicker = flatpickr(dateRangeInput, {
-                mode: "range",
-                dateFormat: "Y-m-d",
-                maxDate: "today",
-                onChange: function(selectedDates, dateStr, instance) {
-                    // Show/hide clear button
-                    if (clearBtn) {
-                        if (selectedDates.length === 2 && dateStr) {
-                            clearBtn.style.display = 'block';
-                        } else {
-                            clearBtn.style.display = 'none';
-                        }
-                    }
-                    
-                    if (selectedDates.length === 2) {
-                        const startDate = selectedDates[0];
-                        const endDate = selectedDates[1];
-                        
-                        // Fetch and update chart data for the selected date range
-                        fetchBillingChartData(startDate, endDate);
-                    } else if (selectedDates.length === 0) {
-                        // Date cleared, reset to current month
-                        resetBillingChart();
-                    }
-                },
-                onClose: function(selectedDates, dateStr, instance) {
-                    // Update clear button visibility
-                    if (clearBtn) {
-                        if (selectedDates.length === 2 && dateStr) {
-                            clearBtn.style.display = 'block';
-                        } else {
-                            clearBtn.style.display = 'none';
-                        }
-                    }
-                },
-                onReady: function(selectedDates, dateStr, instance) {
-                    // Prevent closing dropdown when clicking inside datepicker
-                    if (instance.calendarContainer) {
-                        instance.calendarContainer.addEventListener('click', function(e) {
-                            e.stopPropagation();
-                        });
-                    }
-                    
-                    // Update clear button visibility on ready
-                    if (clearBtn) {
-                        if (selectedDates.length === 2 && dateStr) {
-                            clearBtn.style.display = 'block';
-                        } else {
-                            clearBtn.style.display = 'none';
-                        }
-                    }
-                }
-            });
+        // Populate year dropdown (current year and 10 previous years)
+        const currentYear = new Date().getFullYear();
+        for (let year = currentYear; year >= currentYear - 10; year--) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
         }
+        
+        // Handle year selection change
+        yearSelect.addEventListener('change', function(e) {
+            const selectedYear = e.target.value;
+            
+            // Show/hide clear button
+            if (clearBtn) {
+                if (selectedYear) {
+                    clearBtn.style.display = 'block';
+                } else {
+                    clearBtn.style.display = 'none';
+                }
+            }
+            
+            if (selectedYear) {
+                // Calculate start and end dates for the selected year
+                const startDate = new Date(selectedYear, 0, 1); // January 1st
+                const endDate = new Date(selectedYear, 11, 31); // December 31st
+                
+                // Fetch and update chart data for the selected year
+                fetchBillingChartData(startDate, endDate);
+            } else {
+                // Year cleared, reset to current month
+                resetBillingChart();
+            }
+        });
         
         // Handle clear button click
         if (clearBtn) {
             clearBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (billingChartDatePicker) {
-                    billingChartDatePicker.clear();
-                    resetBillingChart();
-                }
+                yearSelect.value = '';
+                clearBtn.style.display = 'none';
+                resetBillingChart();
             });
         }
         
-        // Open datepicker when dropdown is opened
-        if (dropdownBtn && dropdownMenu && billingChartDatePicker) {
-            dropdownBtn.addEventListener('click', function(e) {
-                // Wait for dropdown to be shown, then open datepicker
-                setTimeout(function() {
-                    // Check if dropdown is visible
-                    if (dropdownMenu.classList.contains('show')) {
-                        // Small delay to ensure dropdown is fully rendered
-                        setTimeout(function() {
-                            if (billingChartDatePicker && !billingChartDatePicker.isOpen) {
-                                billingChartDatePicker.open();
-                            }
-                        }, 100);
-                    }
-                }, 100);
-            });
-        }
-        
-        // Prevent dropdown from closing when clicking inside (except on the input)
+        // Prevent dropdown from closing when clicking inside
         if (dropdownMenu) {
             dropdownMenu.addEventListener('click', function(e) {
-                // Allow clicks on the input, clear button, and datepicker calendar
-                const isDatepickerElement = e.target.closest('.flatpickr-calendar') || 
-                                          e.target === dateRangeInput || 
-                                          dateRangeInput.contains(e.target) ||
+                // Allow clicks on the select, clear button
+                const isYearSelectorElement = e.target === yearSelect || 
+                                          yearSelect.contains(e.target) ||
                                           e.target === clearBtn ||
                                           e.target.closest('#clear_billing_chart_date');
                 
-                if (!isDatepickerElement) {
+                if (!isYearSelectorElement) {
                     e.stopPropagation();
                 }
             });
