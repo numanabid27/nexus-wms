@@ -260,15 +260,17 @@
 <!-- apexcharts -->
 <script src="{{ URL::asset('build/libs/apexcharts/apexcharts.min.js') }}"></script>
 
-<!-- barcharts init -->
-<script src="{{ URL::asset('build/js/pages/apexcharts-bar.init.js') }}"></script>
-
 <script src="{{ URL::asset('build/libs/list.js/list.min.js') }}"></script>
 
-<!-- dashboard-analytics init js -->
+<!-- dashboard-analytics init js - Load charts only once when DOM is ready -->
 <script>
 // Prevent duplicate chart initialization - wait for ApexCharts to load
 (function() {
+    // Prevent multiple initializations
+    if (window.dashboardChartsInitialized) {
+        return;
+    }
+    
     // Store reference to check if chart is already initialized
     window.salesFunnelChartInitialized = false;
     window.pageviewsChartInitialized = false;
@@ -359,9 +361,6 @@
         });
     }
     
-    // Start interception - will retry if ApexCharts not loaded yet
-    interceptApexCharts();
-    
     // Ensure sales_funnel element is visible
     function ensureSalesFunnelVisible() {
         const salesFunnelElement = document.getElementById('sales_funnel');
@@ -386,27 +385,295 @@
         }
     }
     
-    // Run visibility check after DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(ensureSalesFunnelVisible, 100);
-            setTimeout(ensureSalesFunnelVisible, 500);
-            setTimeout(ensureSalesFunnelVisible, 1000);
+    // Watch for duplicate chart creation using MutationObserver
+    function setupChartObserver() {
+        const salesFunnelElement = document.getElementById('sales_funnel');
+        const pageviewsElement = document.getElementById('pageviews_overview');
+        
+        if (!salesFunnelElement && !pageviewsElement) {
+            return;
+        }
+        
+        let isProcessing = false;
+        
+        const observer = new MutationObserver(function(mutations) {
+            // Prevent multiple simultaneous cleanups
+            if (isProcessing) {
+                return;
+            }
+            
+            // Use a debounce to avoid excessive checks
+            setTimeout(function() {
+                isProcessing = true;
+                
+                // Check sales_funnel
+                if (salesFunnelElement) {
+                    const charts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+                    if (charts.length > 1) {
+                        // Keep only the first one, remove the rest
+                        for (let i = 1; i < charts.length; i++) {
+                            const chart = charts[i];
+                            if (chart._apexcharts) {
+                                try { 
+                                    chart._apexcharts.destroy(); 
+                                } catch (e) {}
+                            }
+                            chart.remove();
+                        }
+                    }
+                }
+                
+                // Check pageviews_overview
+                if (pageviewsElement) {
+                    const charts = pageviewsElement.querySelectorAll('.apexcharts-canvas');
+                    if (charts.length > 1) {
+                        // Keep only the first one, remove the rest
+                        for (let i = 1; i < charts.length; i++) {
+                            const chart = charts[i];
+                            if (chart._apexcharts) {
+                                try { 
+                                    chart._apexcharts.destroy(); 
+                                } catch (e) {}
+                            }
+                            chart.remove();
+                        }
+                    }
+                }
+                
+                isProcessing = false;
+            }, 50); // Small delay to debounce
         });
-    } else {
-        setTimeout(ensureSalesFunnelVisible, 100);
-        setTimeout(ensureSalesFunnelVisible, 500);
-        setTimeout(ensureSalesFunnelVisible, 1000);
+        
+        // Observe both elements
+        if (salesFunnelElement) {
+            observer.observe(salesFunnelElement, { childList: true, subtree: true });
+        }
+        if (pageviewsElement) {
+            observer.observe(pageviewsElement, { childList: true, subtree: true });
+        }
+        
+        // Store observer for potential cleanup later
+        window.chartObserver = observer;
     }
     
-    // Also check on window load (important for live server)
+    // Initialize everything when DOM is ready
+    function initializeCharts() {
+        // Prevent multiple initializations
+        if (window.dashboardChartsInitialized) {
+            return;
+        }
+        
+        // Mark as initialized immediately to prevent duplicates
+        window.dashboardChartsInitialized = true;
+        
+        // Start interception
+        interceptApexCharts();
+        
+        // Setup MutationObserver to watch for duplicates
+        setupChartObserver();
+        
+        // Ensure visibility
+        ensureSalesFunnelVisible();
+        
+        // Load dashboard-analytics script
+        loadDashboardAnalyticsScript();
+    }
+    
+    // Clean up any existing charts before loading script
+    function cleanupExistingCharts() {
+        // Clean up sales_funnel
+        const salesFunnelElement = document.getElementById('sales_funnel');
+        if (salesFunnelElement) {
+            // Clear any existing chart content
+            const existingCharts = salesFunnelElement.querySelectorAll('.apexcharts-canvas, .apexcharts-inner, svg');
+            existingCharts.forEach(function(chart) {
+                if (chart._apexcharts) {
+                    try {
+                        chart._apexcharts.destroy();
+                    } catch (e) {}
+                }
+            });
+            // Clear innerHTML to remove any chart remnants
+            salesFunnelElement.innerHTML = '';
+            // Reset initialization flags
+            salesFunnelElement.setAttribute('data-chart-initialized', 'false');
+        }
+        
+        // Clean up pageviews_overview
+        const pageviewsElement = document.getElementById('pageviews_overview');
+        if (pageviewsElement) {
+            // Clear any existing chart content
+            const existingCharts = pageviewsElement.querySelectorAll('.apexcharts-canvas, .apexcharts-inner, svg');
+            existingCharts.forEach(function(chart) {
+                if (chart._apexcharts) {
+                    try {
+                        chart._apexcharts.destroy();
+                    } catch (e) {}
+                }
+            });
+            // Clear innerHTML to remove any chart remnants
+            pageviewsElement.innerHTML = '';
+        }
+        
+        // Reset global chart instances
+        if (window.salesFunnelChart && window.salesFunnelChart !== "") {
+            try {
+                window.salesFunnelChart.destroy();
+            } catch (e) {}
+            window.salesFunnelChart = null;
+        }
+        if (window.pageViewsOverviewChart && window.pageViewsOverviewChart !== "") {
+            try {
+                window.pageViewsOverviewChart.destroy();
+            } catch (e) {}
+            window.pageViewsOverviewChart = null;
+        }
+        
+        // Reset initialization flags
+        window.salesFunnelChartInitialized = false;
+        window.pageviewsChartInitialized = false;
+    }
+    
+    // Load dashboard-analytics script only once
+    function loadDashboardAnalyticsScript() {
+        // Check if script is already loaded or loading
+        if (window.dashboardAnalyticsScriptLoaded || window.dashboardAnalyticsScriptLoading) {
+            return;
+        }
+        
+        // Remove any existing script tags (in case of page refresh/cache issues)
+        const existingScripts = document.querySelectorAll('script[src*="dashboard-analytics.init.js"]');
+        existingScripts.forEach(function(script) {
+            script.remove();
+        });
+        
+        // Clean up any existing charts BEFORE loading the script
+        cleanupExistingCharts();
+        
+        // Mark as loading to prevent multiple loads
+        window.dashboardAnalyticsScriptLoading = true;
+        
+        // Create and load script with a unique ID to track it
+        const script = document.createElement('script');
+        script.src = '{{ URL::asset("build/js/pages/dashboard-analytics.init.js") }}';
+        script.async = false;
+        script.id = 'dashboard-analytics-init-script';
+        script.onload = function() {
+            window.dashboardAnalyticsScriptLoaded = true;
+            window.dashboardAnalyticsScriptLoading = false;
+            
+            // Clean up duplicates immediately after script loads and periodically
+            function quickCleanup() {
+                const salesFunnelElement = document.getElementById('sales_funnel');
+                if (salesFunnelElement) {
+                    const charts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+                    if (charts.length > 1) {
+                        for (let i = 1; i < charts.length; i++) {
+                            const chart = charts[i];
+                            if (chart._apexcharts) {
+                                try { chart._apexcharts.destroy(); } catch (e) {}
+                            }
+                            chart.remove();
+                        }
+                    }
+                }
+                
+                const pageviewsElement = document.getElementById('pageviews_overview');
+                if (pageviewsElement) {
+                    const charts = pageviewsElement.querySelectorAll('.apexcharts-canvas');
+                    if (charts.length > 1) {
+                        for (let i = 1; i < charts.length; i++) {
+                            const chart = charts[i];
+                            if (chart._apexcharts) {
+                                try { chart._apexcharts.destroy(); } catch (e) {}
+                            }
+                            chart.remove();
+                        }
+                    }
+                }
+            }
+            
+            // Run cleanup multiple times to catch any duplicates
+            setTimeout(quickCleanup, 50);
+            setTimeout(quickCleanup, 200);
+            setTimeout(quickCleanup, 500);
+            setTimeout(quickCleanup, 1000);
+        };
+        script.onerror = function() {
+            console.error('Failed to load dashboard-analytics script');
+            window.dashboardAnalyticsScriptLoading = false;
+        };
+        document.head.appendChild(script);
+    }
+    
+    // Wait for DOM to be ready before initializing
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Small delay to ensure ApexCharts library is loaded
+            setTimeout(initializeCharts, 150);
+        });
+    } else {
+        // DOM already ready, initialize with small delay
+        setTimeout(initializeCharts, 150);
+    }
+    
+    // Also check visibility on window load (important for live server)
     window.addEventListener('load', function() {
         setTimeout(ensureSalesFunnelVisible, 100);
         setTimeout(ensureSalesFunnelVisible, 500);
     });
 })();
 </script>
-<script src="{{ URL::asset('build/js/pages/dashboard-analytics.init.js') }}"></script>
+
+<!-- barcharts init - Load after DOM is ready -->
+<script>
+(function() {
+    // Prevent multiple script loads
+    if (window.barchartsScriptLoaded) {
+        return;
+    }
+    
+    function loadBarchartsScript() {
+        // Check if script is already loaded
+        if (window.barchartsScriptLoaded || window.barchartsScriptLoading) {
+            return;
+        }
+        
+        // Check if script tag already exists
+        const existingScript = document.querySelector('script[src*="apexcharts-bar.init.js"]');
+        if (existingScript) {
+            window.barchartsScriptLoaded = true;
+            return;
+        }
+        
+        // Mark as loading
+        window.barchartsScriptLoading = true;
+        
+        // Create and load script
+        const script = document.createElement('script');
+        script.src = '{{ URL::asset("build/js/pages/apexcharts-bar.init.js") }}';
+        script.async = false;
+        script.onload = function() {
+            window.barchartsScriptLoaded = true;
+            window.barchartsScriptLoading = false;
+        };
+        script.onerror = function() {
+            console.error('Failed to load barcharts script');
+            window.barchartsScriptLoading = false;
+        };
+        document.head.appendChild(script);
+    }
+    
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(loadBarchartsScript, 100);
+        });
+    } else {
+        setTimeout(loadBarchartsScript, 100);
+    }
+})();
+</script>
 
 <script>
 // Additional protection against duplicate chart initialization
