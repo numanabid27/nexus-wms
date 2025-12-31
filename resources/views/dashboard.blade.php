@@ -163,10 +163,8 @@
                             <div class="mb-2">
                                 <label class="form-label small text-muted mb-1">{{ __('range') }}:</label>
                                 <div class="position-relative">
-                                    <select class="form-control" id="billing_chart_date_range" name="billing_chart_date_range">
-                                        <option value="">{{ __('Select Year') }}</option>
-                                    </select>
-                                    <button type="button" class="btn btn-link text-muted p-0 position-absolute end-0 top-50 translate-middle-y me-2" id="clear_billing_chart_date" style="display: none; z-index: 10; border: none; background: none; font-size: 1.2rem; line-height: 1;" title="Clear year">
+                                    {!! Form::select('billing_chart_date_range', ['' => __('please_select')], null, array('class' => 'form-control', 'id' => 'billing_chart_date_range')) !!}
+                                    <button type="button" class="btn btn-link text-muted p-0 position-absolute end-0 top-50 translate-middle-y me-2" id="clear_billing_chart_date" style="display: none; z-index: 10; border: none; background: none; font-size: 1.2rem; line-height: 1;" title="Clear range">
                                         <i class="bi bi-x-circle"></i>
                                     </button>
                                 </div>
@@ -1387,7 +1385,227 @@ let dashboardData = {
     }
 })();
 
-// JavaScript filtering functions
+// Billing Summary Chart Initialization and Filtering for Current Year/Range
+(function() {
+    let billingChart = null;
+
+    // Default colors
+    const chartColors = ["--tb-warning-border-subtle", "--tb-danger-border-subtle", "--tb-success-border-subtle"];
+    
+    function getChartColorsArray(chartId) {
+        if (document.getElementById(chartId) !== null) {
+            const colors = document.getElementById(chartId).getAttribute("data-colors");
+            if (colors) {
+                return JSON.parse(colors).map(function(value) {
+                    const newValue = value.replace(" ", "");
+                    if (newValue.indexOf(",") === -1) {
+                        const color = getComputedStyle(document.documentElement).getPropertyValue(newValue);
+                        return color || newValue;
+                    } else {
+                        const val = value.split(",");
+                        if (val.length === 2) {
+                            const rgbaColor = getComputedStyle(document.documentElement).getPropertyValue(val[0]);
+                            return "rgba(" + rgbaColor + "," + val[1] + ")";
+                        } else {
+                            return newValue;
+                        }
+                    }
+                });
+            }
+        }
+        return chartColors; // Fallback
+    }
+
+    function initBillingChart(data) {
+        const element = document.getElementById('billing_summary_bar');
+        if (!element) return;
+
+        // Prevent duplicate - Clean up ANY existing chart instance on this element
+        // Check for ApexCharts instance stored by library
+        if (element._apexcharts) {
+            try {
+                element._apexcharts.destroy();
+            } catch (e) {
+                console.warn('Error destroying existing chart:', e);
+            }
+        }
+        
+        // Check for our local instance
+        if (billingChart) {
+            try {
+                billingChart.destroy();
+            } catch (e) {}
+        }
+        
+        // Force clear the container to remove any artifacts or duplicate SVGs
+        element.innerHTML = '';
+
+        const options = {
+            series: data.series, // Expecting array of objects { name: '...', data: [...] }
+            chart: {
+                type: 'bar',
+                height: 350,
+                toolbar: {
+                    show: false,
+                },
+                // Ensure chart knows it's initialized to prevent re-init by other scripts
+                events: {
+                    mounted: function(chartContext, config) {
+                        element.setAttribute('data-chart-initialized', 'true');
+                    }
+                }
+            },
+            plotOptions: {
+                bar: {
+                    horizontal: false,
+                    columnWidth: '45%',
+                    borderRadius: 4, // Modern look
+                },
+            },
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                show: true,
+                width: 2,
+                colors: ['transparent']
+            },
+            xaxis: {
+                categories: data.categories,
+                
+            },
+           
+            fill: {
+                opacity: 1
+            },
+            colors: getChartColorsArray("billing_summary_bar"),
+            tooltip: {
+                y: {
+                    formatter: function(val) {
+                        return val;
+                    }
+                }
+            },
+            legend: {
+                position: 'bottom'
+            }
+        };
+
+        billingChart = new ApexCharts(element, options);
+        billingChart.render();
+        
+        // Store instance on element for external detection
+        element._apexcharts = billingChart;
+    }
+
+    function fetchBillingData(startDate = null, endDate = null) {
+        let url = '{{ route("dashboard") }}?get_billing_counts=1';
+        if (startDate && endDate) {
+            url += `&start_date=${startDate}&end_date=${endDate}`;
+        }
+
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.series && data.categories) {
+                // If chart already exists, just update series and categories to animate
+                if (billingChart) {
+                    billingChart.updateOptions({
+                        xaxis: {
+                            categories: data.categories
+                        }, 
+                        series: data.series
+                    });
+                } else {
+                    initBillingChart(data);
+                }
+            }
+        })
+        .catch(error => console.error('Error fetching billing data:', error));
+    }
+
+    function initBillingDatePicker() {
+        const yearSelect = document.getElementById('billing_chart_date_range');
+        const clearBtn = document.getElementById('clear_billing_chart_date');
+        
+        if (!yearSelect) return;
+
+        // Populate year dropdown (current year and 10 previous years)
+        const currentYear = new Date().getFullYear();
+        for (let year = currentYear; year >= currentYear - 10; year--) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
+        }
+
+        // Handle year selection change
+        yearSelect.addEventListener('change', function(e) {
+            const selectedYear = e.target.value;
+            
+            // Show/hide clear button
+            if (clearBtn) {
+                if (selectedYear) {
+                    clearBtn.style.display = 'block';
+                } else {
+                    clearBtn.style.display = 'none';
+                }
+            }
+            
+            if (selectedYear) {
+                // Calculate start and end dates for the selected year
+                const startDate = new Date(selectedYear, 0, 1); // January 1st
+                const endDate = new Date(selectedYear, 11, 31); // December 31st
+                const startDateStr = startDate.getFullYear() + '-' + 
+                                    String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                                    String(startDate.getDate()).padStart(2, '0');
+                const endDateStr = endDate.getFullYear() + '-' + 
+                                  String(endDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                                  String(endDate.getDate()).padStart(2, '0');
+                
+                // Fetch data
+                fetchBillingData(startDateStr, endDateStr);
+            } else {
+                // Fetch default (current year) data
+                fetchBillingData();
+            }
+        });
+
+        // Clear button logic
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                yearSelect.value = '';
+                clearBtn.style.display = 'none';
+                // Fetch default (current year) data
+                fetchBillingData();
+            });
+        }
+    }
+
+    // Initialize on load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                initBillingDatePicker();
+                fetchBillingData(); // Fetch default current year data
+            }, 500);
+        });
+    } else {
+        setTimeout(() => {
+            initBillingDatePicker();
+            fetchBillingData();
+        }, 500);
+    }
+
+})();
 function filterByMonth(data, yearMonth) {
     const [year, month] = yearMonth.split('-').map(Number);
     // Use UTC dates to avoid timezone issues
@@ -2580,7 +2798,7 @@ function getCountForDateRange(data, startDate, endDate) {
                                 dataLabels: {
                                     position: 'top',
                                 },
-                                distributed: true, // This makes each bar use a different color
+                                distributed: true, 
                             }
                         },
                         dataLabels: {

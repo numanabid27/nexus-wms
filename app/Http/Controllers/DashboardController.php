@@ -81,38 +81,106 @@ class DashboardController extends Controller
         if ($request->ajax() && $request->has('get_billing_counts')) {
             $startDate = $request->input('start_date');
             $endDate = $request->input('end_date');
-            
+
             if ($startDate && $endDate) {
-                $monthStartDate = Carbon::parse($startDate)->startOfDay();
-                $monthEndDate = Carbon::parse($endDate)->endOfDay();
+                // Parse provided dates
+                $start = Carbon::parse($startDate)->startOfDay();
+                $end = Carbon::parse($endDate)->endOfDay();
             } else {
-                // Default to current month
+                // Default to current year (Jan 1 to Dec 31)
                 $today = Carbon::today();
-                $monthStartDate = $today->copy()->startOfMonth()->startOfDay();
-                $monthEndDate = $today->copy()->endOfMonth()->endOfDay();
+                $start = $today->copy()->startOfYear()->startOfDay();
+                $end = $today->copy()->endOfYear()->endOfDay();
             }
 
-            $generatedBills = Billing::where('company_id', $companyId)
-                ->where('invoice_generated', 0)
-                ->whereBetween('generated_date', [$monthStartDate, $monthEndDate])
-                ->count();
+            // Generate all months in range for X-axis
+            $months = [];
+            $monthLabels = [];
+            $current = $start->copy()->startOfMonth();
+            $endMonth = $end->copy()->startOfMonth();
 
-            $unpaidInvoices = Billing::where('company_id', $companyId)
+            while ($current <= $endMonth) {
+                $key = $current->format('Y-m'); // Key for matching data
+                $months[$key] = [
+                    'label' => $current->format('M Y'), // Label for chart
+                    'generated' => 0,
+                    'unpaid' => 0,
+                    'paid' => 0
+                ];
+                $monthLabels[] = $current->format('M Y');
+                $current->addMonth();
+            }
+
+            // Fetch Generated Bills (grouped by month)
+            $generatedData = Billing::where('company_id', $companyId)
+                ->where('invoice_generated', 0)
+                ->whereBetween('generated_date', [$start, $end])
+                ->selectRaw('DATE_FORMAT(generated_date, "%Y-%m") as month, COUNT(*) as count')
+                ->groupBy('month')
+                ->get();
+
+            // Fetch Unpaid Invoices (grouped by month)
+            $unpaidData = Billing::where('company_id', $companyId)
                 ->where('is_paid', 0)
                 ->where('invoice_generated', 1)
-                ->whereBetween('generated_date', [$monthStartDate, $monthEndDate])
-                ->count();
+                ->whereBetween('generated_date', [$start, $end])
+                ->selectRaw('DATE_FORMAT(generated_date, "%Y-%m") as month, COUNT(*) as count')
+                ->groupBy('month')
+                ->get();
 
-            $paidInvoices = Billing::where('company_id', $companyId)
+            // Fetch Paid Invoices (grouped by month)
+            $paidData = Billing::where('company_id', $companyId)
                 ->where('is_paid', 1)
                 ->where('invoice_generated', 1)
-                ->whereBetween('generated_date', [$monthStartDate, $monthEndDate])
-                ->count();
+                ->whereBetween('generated_date', [$start, $end])
+                ->selectRaw('DATE_FORMAT(generated_date, "%Y-%m") as month, COUNT(*) as count')
+                ->groupBy('month')
+                ->get();
+
+            // Merge data into months array
+            foreach ($generatedData as $item) {
+                if (isset($months[$item->month])) {
+                    $months[$item->month]['generated'] = (int) $item->count;
+                }
+            }
+            foreach ($unpaidData as $item) {
+                if (isset($months[$item->month])) {
+                    $months[$item->month]['unpaid'] = (int) $item->count;
+                }
+            }
+            foreach ($paidData as $item) {
+                if (isset($months[$item->month])) {
+                    $months[$item->month]['paid'] = (int) $item->count;
+                }
+            }
+
+            // Prepare series data
+            $generatedSeries = [];
+            $unpaidSeries = [];
+            $paidSeries = [];
+
+            foreach ($months as $data) {
+                $generatedSeries[] = $data['generated'];
+                $unpaidSeries[] = $data['unpaid'];
+                $paidSeries[] = $data['paid'];
+            }
 
             return response()->json([
-                'generatedBills' => $generatedBills,
-                'unpaidInvoices' => $unpaidInvoices,
-                'paidInvoices' => $paidInvoices
+                'categories' => $monthLabels,
+                'series' => [
+                    [
+                        'name' => 'Pending Bills',
+                        'data' => $generatedSeries
+                    ],
+                    [
+                        'name' => 'Unpaid Invoices',
+                        'data' => $unpaidSeries
+                    ],
+                    [
+                        'name' => 'Paid Invoices',
+                        'data' => $paidSeries
+                    ]
+                ]
             ]);
         }
 
@@ -120,7 +188,7 @@ class DashboardController extends Controller
         if ($request->ajax() && $request->has('get_driver_chart_data')) {
             $startDate = $request->input('start_date');
             $endDate = $request->input('end_date');
-            
+
             if ($startDate && $endDate) {
                 $chartStartDate = Carbon::parse($startDate)->startOfDay();
                 $chartEndDate = Carbon::parse($endDate)->endOfDay();
@@ -132,20 +200,20 @@ class DashboardController extends Controller
             }
 
             $bar_cart_data = User::withCount([
-                    'collections_driver' => function ($q) use ($chartStartDate, $chartEndDate) {
-                        $q->whereBetween('pickup_date', [$chartStartDate, $chartEndDate]);
-                    }, 
-                    'dumps_driver' => function ($q) use ($chartStartDate, $chartEndDate) {
-                        $q->whereBetween('dump_date', [$chartStartDate, $chartEndDate]);
-                    }
-                ])
+                'collections_driver' => function ($q) use ($chartStartDate, $chartEndDate) {
+                    $q->whereBetween('pickup_date', [$chartStartDate, $chartEndDate]);
+                },
+                'dumps_driver' => function ($q) use ($chartStartDate, $chartEndDate) {
+                    $q->whereBetween('dump_date', [$chartStartDate, $chartEndDate]);
+                }
+            ])
                 ->whereHas('roles', function ($query) {
                     $query->where('name', 'Driver');
                 })
                 ->where('company_id', $companyId)
                 ->where('is_deleted', 0)
                 ->get();
-                
+
             $bar_cart = [
                 'drivers' => $bar_cart_data->pluck('name')->map(fn($n) => "\"{$n}\"")->implode(' , '),
                 'collections' => $bar_cart_data->pluck('collections_driver_count')->implode(' , '),
@@ -232,7 +300,7 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
-        
+
         // billing summary
         $generatedBills = Billing::where('company_id', $companyId)
             ->where('invoice_generated', 0)
@@ -250,9 +318,9 @@ class DashboardController extends Controller
             ->where('invoice_generated', 1)
             ->whereBetween('generated_date', [$monthStartDate, $monthEndDate])
             ->count();
-       
 
-    
+
+
 
         return view('dashboard', compact('totalCollections', 'totalEmployes', 'totalVehicles', 'totalCustomers', 'totalDumpHistories', 'chartData', 'chartCategories', 'currentMonth', 'topDrivers', 'topHelpers', 'generatedBills', 'unpaidInvoices', 'paidInvoices'));
     }
