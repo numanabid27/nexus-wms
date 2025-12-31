@@ -95,65 +95,110 @@
 </div>
 
 <script>
-    var chartGroupbarColors = "";
-    chartGroupbarColors = getChartColorsArray("collection_dump_bar");
-    if (chartGroupbarColors) {
-        var options = {
-            series: [{
-                name: "Collection Count",
-                data: [<?php echo $bar_cart['collections'] ?>]
-            }, {
-                name: "Dumps Count",
-                data: [<?php echo $bar_cart['dumps'] ?>]
-            }],
-            chart: {
-                type: 'bar',
-                height: 410,
-                toolbar: {
-                    show: false,
-                }
-            },
-            plotOptions: {
-                bar: {
-                    horizontal: false,
-                    dataLabels: {
-                        position: 'top',
-                    },
-                }
-            },
-            dataLabels: {
-                enabled: true,
-                offsetX: -6,
-                style: {
-                    fontSize: '12px',
-                    colors: ['#fff']
-                }
-            },
-            grid: {
-                padding: {
-                    bottom: -14,
-                    left: 0,
-                    right: 0
-                }
-            },
-            stroke: {
-                show: true,
-                width: 1,
-                colors: ['#fff']
-            },
-            tooltip: {
-                shared: true,
-                intersect: false
-            },
-            xaxis: {
-                categories: [ <?php echo $bar_cart['drivers'] ?>],
-            },
-            colors: chartGroupbarColors
-        };
+    (function() {
+        // Wait for DOM to be ready and ensure dependencies are loaded
+        function initChart() {
+            var chartElement = document.querySelector("#collection_dump_bar");
+            if (!chartElement) {
+                // Element not found yet, try again
+                setTimeout(initChart, 100);
+                return;
+            }
+            
+            // Check if ApexCharts is available
+            if (typeof ApexCharts === 'undefined') {
+                console.error("ApexCharts library not loaded");
+                setTimeout(initChart, 200);
+                return;
+            }
+            
+            // Check if getChartColorsArray is available
+            if (typeof getChartColorsArray === 'undefined') {
+                console.error("getChartColorsArray function not available");
+                setTimeout(initChart, 200);
+                return;
+            }
+            
+            try {
+                var chartGroupbarColors = "";
+                chartGroupbarColors = getChartColorsArray("collection_dump_bar");
+                if (chartGroupbarColors) {
+                    var options = {
+                        series: [{
+                            name: "Collection Count",
+                            data: [<?php echo $bar_cart['collections'] ?>]
+                        }, {
+                            name: "Dumps Count",
+                            data: [<?php echo $bar_cart['dumps'] ?>]
+                        }],
+                        chart: {
+                            type: 'bar',
+                            height: 410,
+                            toolbar: {
+                                show: false,
+                            }
+                        },
+                        plotOptions: {
+                            bar: {
+                                horizontal: false,
+                                dataLabels: {
+                                    position: 'top',
+                                },
+                            }
+                        },
+                        dataLabels: {
+                            enabled: true,
+                            offsetX: -6,
+                            style: {
+                                fontSize: '12px',
+                                colors: ['#fff']
+                            }
+                        },
+                        grid: {
+                            padding: {
+                                bottom: -14,
+                                left: 0,
+                                right: 0
+                            }
+                        },
+                        stroke: {
+                            show: true,
+                            width: 1,
+                            colors: ['#fff']
+                        },
+                        tooltip: {
+                            shared: true,
+                            intersect: false
+                        },
+                        xaxis: {
+                            categories: [ <?php echo $bar_cart['drivers'] ?>],
+                        },
+                        colors: chartGroupbarColors
+                    };
 
-        if (chartGroupbar != "")
-            chartGroupbar.destroy();
-        chartGroupbar = new ApexCharts(document.querySelector("#collection_dump_bar"), options);
-        chartGroupbar.render();
-    }
+                    // Ensure chartGroupbar is declared globally
+                    if (typeof chartGroupbar === 'undefined') {
+                        window.chartGroupbar = "";
+                    }
+                    
+                    if (window.chartGroupbar && window.chartGroupbar !== "")
+                        window.chartGroupbar.destroy();
+                    
+                    window.chartGroupbar = new ApexCharts(chartElement, options);
+                    window.chartGroupbar.render();
+                }
+            } catch (e) {
+                console.error("Error initializing chart:", e);
+            }
+        }
+        
+        // Start initialization
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(initChart, 100);
+            });
+        } else {
+            setTimeout(initChart, 100);
+        }
+    })();
 </script>

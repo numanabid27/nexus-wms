@@ -34,7 +34,6 @@
                             <option value="{{ $driver->id }}">{{ $driver->name }}</option>
                             @endforeach
                         </select>
-                        
                     </div>
                     
                     <div class="col-3">
@@ -82,6 +81,8 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <script>
+    // Declare chartGroupbar globally to ensure it's available
+    var chartGroupbar = "";
 
     $("body").on("submit","#fetch-report",function(e){
         
@@ -100,8 +101,29 @@
             dataType: 'html',
             success: function(response) {
                 
-                $("#generated-div").html(response)
-                // $("#response").html(response); // Show server response
+                // Insert HTML response
+                $("#generated-div").html(response);
+                
+                // Extract and execute scripts manually (jQuery .html() may not execute scripts on some servers)
+                var tempDiv = $('<div>').html(response);
+                var scripts = tempDiv.find("script");
+                
+                scripts.each(function() {
+                    var scriptContent = $(this).html();
+                    if (scriptContent && scriptContent.trim()) {
+                        // Create a new script element and execute it
+                        var script = document.createElement('script');
+                        script.type = 'text/javascript';
+                        script.text = scriptContent;
+                        document.body.appendChild(script);
+                        document.body.removeChild(script);
+                    }
+                });
+                
+                // Also try to initialize chart after a short delay to ensure everything is loaded
+                setTimeout(function() {
+                    initializeReportChart();
+                }, 300);
             },
             error: function() {
                 Toastify({
@@ -119,6 +141,44 @@
         });
         
     })
+    
+    // Function to initialize the report chart
+    function initializeReportChart() {
+        var chartElement = document.querySelector("#collection_dump_bar");
+        if (!chartElement) {
+            return; // Element not found, chart data might not be loaded yet
+        }
+        
+        // Check if ApexCharts is available
+        if (typeof ApexCharts === 'undefined') {
+            console.error("ApexCharts library not loaded");
+            return;
+        }
+        
+        // Check if getChartColorsArray is available
+        if (typeof getChartColorsArray === 'undefined') {
+            console.error("getChartColorsArray function not available");
+            return;
+        }
+        
+        // Get chart data from the element or from a data attribute
+        var chartData = chartElement.getAttribute('data-chart-data');
+        if (!chartData) {
+            // Try to get data from the script tag that was inserted
+            var scriptTag = document.querySelector('#generated-div script');
+            if (scriptTag) {
+                // Re-execute the chart initialization
+                var scriptContent = scriptTag.innerHTML;
+                if (scriptContent) {
+                    try {
+                        eval(scriptContent);
+                    } catch (e) {
+                        console.error("Error initializing chart:", e);
+                    }
+                }
+            }
+        }
+    }
     
     $("body").on("click","#btn-print" ,function(){
         let div = $("#print-report")[0];

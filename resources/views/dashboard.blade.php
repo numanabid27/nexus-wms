@@ -140,11 +140,50 @@
                     data-colors='["--tb-primary ", "--tb-success"]'
                     data-dump-histories="{{ $totalDumpHistories ?? 0 }}"
                     data-collection="{{ $totalCollections ?? 0 }}"
+                    data-chart-initialized="false"
+                    style="min-height: 300px;"
                     class="apex-charts" dir="ltr"></div>
             </div>
         </div>
     </div>
     <!--end col-->
+   
+
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header d-flex align-items-center flex-wrap gap-3">
+                <h5 class="card-title mb-0 flex-grow-1">Billing Summary</h5>
+                <div class="flex-shrink-0">
+                    <div class="dropdown card-header-dropdown">
+                        <a class="text-reset dropdown-btn" href="#!" data-bs-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <span class="text-muted fs-lg"><i class="bi bi-three-dots-vertical"></i></span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 300px;">
+                            <div class="mb-2">
+                                <label class="form-label small text-muted mb-1">{{ __('range') }}:</label>
+                                <div class="position-relative">
+                                    {!! Form::text('billing_chart_date_range', null, array('placeholder' => __('range'),'class' => 'form-control flatpickr-input', 'id' => 'billing_chart_date_range', 'readonly'=>"readonly")) !!}
+                                    <button type="button" class="btn btn-link text-muted p-0 position-absolute end-0 top-50 translate-middle-y me-2" id="clear_billing_chart_date" style="display: none; z-index: 10; border: none; background: none; font-size: 1.2rem; line-height: 1;" title="Clear date">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-12">
+                        <div id="billing_summary_bar" data-colors='["--tb-warning-border-subtle","--tb-danger-border-subtle","--tb-success-border-subtle"]' class="apex-charts" dir="ltr"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end col-->
+
     <div class="col-xl-4 col-lg-6">
         <div class="card card-height-100" style="height: 40vh;">
             <div class="card-header d-flex">
@@ -176,7 +215,7 @@
             </div>
         </div>
     </div>
-    <!--end col-->
+
     <div class="col-xl-4 col-lg-6">
         <div class="card card-height-100" style="height: 40vh;">
             <div class="card-header d-flex">
@@ -208,37 +247,12 @@
             </div>
         </div>
     </div>
-    <!--end col-->
-   
-    <!--end col-->
-    {{-- <div class="col-xl-5 col-lg-6">
-        <div class="card card-height-100">
-            <div class="card-header d-flex align-items-center">
-                <h5 class="card-title mb-0 flex-grow-1">Sales Report</h5>
-                <div class="flex-shrink-0">
-                    <button type="button" class="btn btn-subtle-info btn-sm"><i
-                            class="bi bi-file-earmark-text me-1 align-baseline"></i> Generate Reports</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="sales_Report" data-colors='["--tb-primary", "--tb-danger"]' class="apex-charts ms-n3"
-                    dir="ltr"></div>
-            </div>
-        </div>
-    </div> --}}
-    <!--end col-->
-    {{-- <div class="col-xl-3 col-lg-6">
-        <div class="card text-center">
-            <div class="card-body">
-                <h5 class="card-title mb-2">Your team Performance this week</h5>
-                <div id="team_performance" data-colors='["--tb-primary"]' class="apex-charts" dir="ltr"></div>
-                <p class="text-muted mt-4">Your team performance is <b>8%</b> better than this week</p>
-                <button class="btn btn-info">View Details</button>
-            </div>
-        </div>
-    </div> --}}
-    <!--end col-->
+
+
 </div>
+<!--end row-->
+
+
 <!--end row-->
 
 @endsection
@@ -246,10 +260,221 @@
 <!-- apexcharts -->
 <script src="{{ URL::asset('build/libs/apexcharts/apexcharts.min.js') }}"></script>
 
+<!-- barcharts init -->
+<script src="{{ URL::asset('build/js/pages/apexcharts-bar.init.js') }}"></script>
+
 <script src="{{ URL::asset('build/libs/list.js/list.min.js') }}"></script>
 
 <!-- dashboard-analytics init js -->
+<script>
+// Prevent duplicate chart initialization - wait for ApexCharts to load
+(function() {
+    // Store reference to check if chart is already initialized
+    window.salesFunnelChartInitialized = false;
+    window.pageviewsChartInitialized = false;
+    window.chartInstances = window.chartInstances || {};
+    
+    function interceptApexCharts() {
+        // Wait for ApexCharts to be available (important for live server with network latency)
+        if (typeof ApexCharts === 'undefined') {
+            // Retry after a short delay if ApexCharts not loaded yet
+            setTimeout(interceptApexCharts, 100);
+            return;
+        }
+        
+        // Only intercept if not already done
+        if (window.apexChartsIntercepted) {
+            return;
+        }
+        window.apexChartsIntercepted = true;
+        
+        const OriginalApexCharts = ApexCharts;
+        ApexCharts = function(selector, options) {
+            const element = typeof selector === 'string' ? document.querySelector(selector) : selector;
+            const elementId = element ? element.id : (typeof selector === 'string' ? selector : '');
+            
+            // Check if element already has a chart instance
+            if (element && elementId) {
+                // Check if chart already exists in DOM
+                const existingChart = element.querySelector('.apexcharts-canvas');
+                if (existingChart) {
+                    // Chart already exists, try to return existing instance
+                    if (window.chartInstances[elementId]) {
+                        return window.chartInstances[elementId];
+                    }
+                }
+            }
+            
+            // Check if this is for sales_funnel and already initialized
+            if (elementId === 'sales_funnel') {
+                if (window.salesFunnelChartInitialized) {
+                    // Check if element has chart already
+                    if (element && element.querySelector('.apexcharts-canvas')) {
+                        // Return existing chart instance if available
+                        if (window.salesFunnelChart && window.salesFunnelChart !== "") {
+                            return window.salesFunnelChart;
+                        }
+                        // Chart exists in DOM but no instance, destroy and recreate
+                        element.innerHTML = '';
+                    } else if (window.salesFunnelChart && window.salesFunnelChart !== "") {
+                        return window.salesFunnelChart;
+                    }
+                }
+                window.salesFunnelChartInitialized = true;
+            }
+            
+            // Check if this is for pageviews_overview and already initialized
+            if (elementId === 'pageviews_overview') {
+                if (window.pageviewsChartInitialized) {
+                    // Check if element has chart already
+                    if (element && element.querySelector('.apexcharts-canvas')) {
+                        // Return existing chart instance if available
+                        if (window.pageViewsOverviewChart && window.pageViewsOverviewChart !== "") {
+                            return window.pageViewsOverviewChart;
+                        }
+                        // Chart exists in DOM but no instance, destroy and recreate
+                        element.innerHTML = '';
+                    } else if (window.pageViewsOverviewChart && window.pageViewsOverviewChart !== "") {
+                        return window.pageViewsOverviewChart;
+                    }
+                }
+                window.pageviewsChartInitialized = true;
+            }
+            
+            const chartInstance = new OriginalApexCharts(selector, options);
+            
+            // Store instance for future reference
+            if (elementId) {
+                window.chartInstances[elementId] = chartInstance;
+            }
+            
+            return chartInstance;
+        };
+        
+        // Copy static methods and prototype
+        Object.setPrototypeOf(ApexCharts, OriginalApexCharts);
+        Object.setPrototypeOf(ApexCharts.prototype, OriginalApexCharts.prototype);
+        Object.keys(OriginalApexCharts).forEach(key => {
+            ApexCharts[key] = OriginalApexCharts[key];
+        });
+    }
+    
+    // Start interception - will retry if ApexCharts not loaded yet
+    interceptApexCharts();
+    
+    // Ensure sales_funnel element is visible
+    function ensureSalesFunnelVisible() {
+        const salesFunnelElement = document.getElementById('sales_funnel');
+        if (salesFunnelElement) {
+            // Remove any inline styles that might hide it
+            if (salesFunnelElement.style.display === 'none') {
+                salesFunnelElement.style.display = '';
+            }
+            if (salesFunnelElement.style.visibility === 'hidden') {
+                salesFunnelElement.style.visibility = 'visible';
+            }
+            // Ensure parent is visible
+            const parent = salesFunnelElement.closest('.card-body');
+            if (parent) {
+                if (parent.style.display === 'none') {
+                    parent.style.display = '';
+                }
+                if (parent.style.visibility === 'hidden') {
+                    parent.style.visibility = 'visible';
+                }
+            }
+        }
+    }
+    
+    // Run visibility check after DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(ensureSalesFunnelVisible, 100);
+            setTimeout(ensureSalesFunnelVisible, 500);
+            setTimeout(ensureSalesFunnelVisible, 1000);
+        });
+    } else {
+        setTimeout(ensureSalesFunnelVisible, 100);
+        setTimeout(ensureSalesFunnelVisible, 500);
+        setTimeout(ensureSalesFunnelVisible, 1000);
+    }
+    
+    // Also check on window load (important for live server)
+    window.addEventListener('load', function() {
+        setTimeout(ensureSalesFunnelVisible, 100);
+        setTimeout(ensureSalesFunnelVisible, 500);
+    });
+})();
+</script>
 <script src="{{ URL::asset('build/js/pages/dashboard-analytics.init.js') }}"></script>
+
+<script>
+// Additional protection against duplicate chart initialization
+(function() {
+    // Wait for dashboard-analytics script to potentially initialize charts
+    function preventDuplicateInitialization() {
+        // Check and clean up sales_funnel
+        const salesFunnelElement = document.getElementById('sales_funnel');
+        if (salesFunnelElement) {
+            // Ensure visibility
+            salesFunnelElement.style.display = '';
+            salesFunnelElement.style.visibility = 'visible';
+            salesFunnelElement.style.opacity = '1';
+            
+            // Check for multiple chart instances
+            const charts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+            if (charts.length > 1) {
+                // Keep only the first one
+                for (let i = 1; i < charts.length; i++) {
+                    const chart = charts[i];
+                    if (chart._apexcharts) {
+                        try {
+                            chart._apexcharts.destroy();
+                        } catch (e) {}
+                    }
+                    chart.remove();
+                }
+            }
+        }
+        
+        // Check and clean up pageviews_overview
+        const pageviewsElement = document.getElementById('pageviews_overview');
+        if (pageviewsElement) {
+            const charts = pageviewsElement.querySelectorAll('.apexcharts-canvas');
+            if (charts.length > 1) {
+                // Keep only the first one
+                for (let i = 1; i < charts.length; i++) {
+                    const chart = charts[i];
+                    if (chart._apexcharts) {
+                        try {
+                            chart._apexcharts.destroy();
+                        } catch (e) {}
+                    }
+                    chart.remove();
+                }
+            }
+        }
+    }
+    
+    // Run immediately and after delays
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(preventDuplicateInitialization, 500);
+            setTimeout(preventDuplicateInitialization, 1500);
+            setTimeout(preventDuplicateInitialization, 3000);
+        });
+    } else {
+        setTimeout(preventDuplicateInitialization, 500);
+        setTimeout(preventDuplicateInitialization, 1500);
+        setTimeout(preventDuplicateInitialization, 3000);
+    }
+    
+    window.addEventListener('load', function() {
+        setTimeout(preventDuplicateInitialization, 500);
+        setTimeout(preventDuplicateInitialization, 1500);
+    });
+})();
+</script>
 
 <script>
 // Handle Summery dropdown filter with datepicker
@@ -436,6 +661,29 @@
             return;
         }
         
+        // Ensure element is visible
+        if (salesFunnelElement.style.display === 'none') {
+            salesFunnelElement.style.display = '';
+        }
+        if (salesFunnelElement.style.visibility === 'hidden') {
+            salesFunnelElement.style.visibility = 'visible';
+        }
+        
+        // Check for duplicate charts and remove them
+        const existingCharts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+        if (existingCharts.length > 1) {
+            // Multiple charts detected, keep only the first one
+            for (let i = 1; i < existingCharts.length; i++) {
+                const chartToRemove = existingCharts[i];
+                if (chartToRemove._apexcharts) {
+                    try {
+                        chartToRemove._apexcharts.destroy();
+                    } catch (e) {}
+                }
+                chartToRemove.remove();
+            }
+        }
+        
         // Update both data attributes
         salesFunnelElement.setAttribute('data-dump-histories', dumpCount);
         salesFunnelElement.setAttribute('data-collection', collectionCount);
@@ -446,22 +694,70 @@
             chart = salesFunnelChart;
         } else if (typeof window.salesFunnelChart !== 'undefined' && window.salesFunnelChart && window.salesFunnelChart !== "") {
             chart = window.salesFunnelChart;
+        } else if (existingCharts.length > 0 && existingCharts[0]._apexcharts) {
+            // Try to get chart from DOM element
+            chart = existingCharts[0]._apexcharts;
         }
         
         if (chart && typeof chart.updateSeries === 'function') {
-            chart.updateSeries([dumpCount, collectionCount]);
-        } else {
-            // Chart not ready, reload it
-            if (typeof loadCharts === 'function') {
+            try {
+                chart.updateSeries([dumpCount, collectionCount]);
+                return; // Successfully updated, exit early
+            } catch (e) {
+                console.warn('Error updating sales funnel chart:', e);
+            }
+        }
+        
+        // Chart not ready or update failed, wait a bit and try again
+        setTimeout(function() {
+            let existingChart = null;
+            if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "") {
+                existingChart = salesFunnelChart;
+            } else if (typeof window.salesFunnelChart !== 'undefined' && window.salesFunnelChart && window.salesFunnelChart !== "") {
+                existingChart = window.salesFunnelChart;
+            } else {
+                // Check DOM for chart instance
+                const charts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+                if (charts.length > 0 && charts[0]._apexcharts) {
+                    existingChart = charts[0]._apexcharts;
+                }
+            }
+            
+            if (existingChart && typeof existingChart.updateSeries === 'function') {
+                try {
+                    existingChart.updateSeries([dumpCount, collectionCount]);
+                    return;
+                } catch (e) {
+                    console.warn('Error updating sales funnel chart on retry:', e);
+                }
+            }
+            
+            // Only reload if chart truly doesn't exist and no charts in DOM
+            const chartsInDOM = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+            if (chartsInDOM.length === 0 && typeof loadCharts === 'function') {
+                // Destroy any existing chart instance first
+                if (existingChart && typeof existingChart.destroy === 'function') {
+                    try {
+                        existingChart.destroy();
+                    } catch (e) {}
+                }
+                // Clear element to ensure clean initialization
+                salesFunnelElement.innerHTML = '';
                 loadCharts();
                 // Try to update after a short delay
                 setTimeout(function() {
-                    if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "" && typeof salesFunnelChart.updateSeries === 'function') {
-                        salesFunnelChart.updateSeries([dumpCount, collectionCount]);
+                    let newChart = null;
+                    if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "") {
+                        newChart = salesFunnelChart;
+                    } else if (typeof window.salesFunnelChart !== 'undefined' && window.salesFunnelChart && window.salesFunnelChart !== "") {
+                        newChart = window.salesFunnelChart;
                     }
-                }, 200);
+                    if (newChart && typeof newChart.updateSeries === 'function') {
+                        newChart.updateSeries([dumpCount, collectionCount]);
+                    }
+                }, 300);
             }
-        }
+        }, 200);
     }
     
     function resetSummeryChart() {
@@ -476,6 +772,29 @@
             return;
         }
         
+        // Ensure element is visible
+        if (salesFunnelElement.style.display === 'none') {
+            salesFunnelElement.style.display = '';
+        }
+        if (salesFunnelElement.style.visibility === 'hidden') {
+            salesFunnelElement.style.visibility = 'visible';
+        }
+        
+        // Check for duplicate charts and remove them
+        const existingCharts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+        if (existingCharts.length > 1) {
+            // Multiple charts detected, keep only the first one
+            for (let i = 1; i < existingCharts.length; i++) {
+                const chartToRemove = existingCharts[i];
+                if (chartToRemove._apexcharts) {
+                    try {
+                        chartToRemove._apexcharts.destroy();
+                    } catch (e) {}
+                }
+                chartToRemove.remove();
+            }
+        }
+        
         // Update both data attributes
         salesFunnelElement.setAttribute('data-dump-histories', dumpCount);
         salesFunnelElement.setAttribute('data-collection', collectionCount);
@@ -486,30 +805,179 @@
             chart = salesFunnelChart;
         } else if (typeof window.salesFunnelChart !== 'undefined' && window.salesFunnelChart && window.salesFunnelChart !== "") {
             chart = window.salesFunnelChart;
+        } else if (existingCharts.length > 0 && existingCharts[0]._apexcharts) {
+            // Try to get chart from DOM element
+            chart = existingCharts[0]._apexcharts;
         }
         
         if (chart && typeof chart.updateSeries === 'function') {
-            chart.updateSeries([dumpCount, collectionCount]);
-        } else {
-            // Chart not ready, reload it
-            if (typeof loadCharts === 'function') {
+            try {
+                chart.updateSeries([dumpCount, collectionCount]);
+                return; // Successfully updated, exit early
+            } catch (e) {
+                console.warn('Error updating sales funnel chart:', e);
+            }
+        }
+        
+        // Chart not ready or update failed, wait a bit and try again
+        setTimeout(function() {
+            let existingChart = null;
+            if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "") {
+                existingChart = salesFunnelChart;
+            } else if (typeof window.salesFunnelChart !== 'undefined' && window.salesFunnelChart && window.salesFunnelChart !== "") {
+                existingChart = window.salesFunnelChart;
+            } else {
+                // Check DOM for chart instance
+                const charts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+                if (charts.length > 0 && charts[0]._apexcharts) {
+                    existingChart = charts[0]._apexcharts;
+                }
+            }
+            
+            if (existingChart && typeof existingChart.updateSeries === 'function') {
+                try {
+                    existingChart.updateSeries([dumpCount, collectionCount]);
+                    return;
+                } catch (e) {
+                    console.warn('Error updating sales funnel chart on retry:', e);
+                }
+            }
+            
+            // Only reload if chart truly doesn't exist and no charts in DOM
+            const chartsInDOM = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+            if (chartsInDOM.length === 0 && typeof loadCharts === 'function') {
+                // Destroy any existing chart instance first
+                if (existingChart && typeof existingChart.destroy === 'function') {
+                    try {
+                        existingChart.destroy();
+                    } catch (e) {}
+                }
+                // Clear element to ensure clean initialization
+                salesFunnelElement.innerHTML = '';
                 loadCharts();
                 setTimeout(function() {
-                    if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "" && typeof salesFunnelChart.updateSeries === 'function') {
-                        salesFunnelChart.updateSeries([dumpCount, collectionCount]);
+                    let newChart = null;
+                    if (typeof salesFunnelChart !== 'undefined' && salesFunnelChart && salesFunnelChart !== "") {
+                        newChart = salesFunnelChart;
+                    } else if (typeof window.salesFunnelChart !== 'undefined' && window.salesFunnelChart && window.salesFunnelChart !== "") {
+                        newChart = window.salesFunnelChart;
                     }
-                }, 200);
+                    if (newChart && typeof newChart.updateSeries === 'function') {
+                        newChart.updateSeries([dumpCount, collectionCount]);
+                    }
+                }, 300);
+            }
+        }, 200);
+    }
+    
+    // Cleanup function to remove duplicate charts and show charts after cleanup
+    function cleanupDuplicateCharts() {
+        // Cleanup sales_funnel chart
+        const salesFunnelElement = document.getElementById('sales_funnel');
+        if (salesFunnelElement) {
+            // Ensure element is visible
+            if (salesFunnelElement.style.display === 'none') {
+                salesFunnelElement.style.display = '';
+            }
+            if (salesFunnelElement.style.visibility === 'hidden') {
+                salesFunnelElement.style.visibility = 'visible';
+            }
+            
+            const existingCharts = salesFunnelElement.querySelectorAll('.apexcharts-canvas');
+            if (existingCharts.length > 1) {
+                // Multiple charts detected, keep only the first one and remove others
+                for (let i = 1; i < existingCharts.length; i++) {
+                    const chartToRemove = existingCharts[i];
+                    // Try to destroy the chart instance if it exists
+                    if (chartToRemove._apexcharts) {
+                        try {
+                            chartToRemove._apexcharts.destroy();
+                        } catch (e) {
+                            console.warn('Error destroying duplicate chart:', e);
+                        }
+                    }
+                    chartToRemove.parentNode.remove();
+                }
+                // Also remove any duplicate SVG elements
+                const svgElements = salesFunnelElement.querySelectorAll('svg');
+                if (svgElements.length > 1) {
+                    for (let i = 1; i < svgElements.length; i++) {
+                        svgElements[i].remove();
+                    }
+                }
+                // Remove any duplicate apexcharts containers
+                const containers = salesFunnelElement.querySelectorAll('.apexcharts-inner, .apexcharts-svg');
+                if (containers.length > 2) {
+                    // Keep first two (inner and svg), remove rest
+                    for (let i = 2; i < containers.length; i++) {
+                        containers[i].remove();
+                    }
+                }
+            }
+        }
+        
+        // Cleanup pageviews_overview chart
+        const pageviewsElement = document.getElementById('pageviews_overview');
+        if (pageviewsElement) {
+            const existingCharts = pageviewsElement.querySelectorAll('.apexcharts-canvas');
+            if (existingCharts.length > 1) {
+                // Multiple charts detected, keep only the first one and remove others
+                for (let i = 1; i < existingCharts.length; i++) {
+                    const chartToRemove = existingCharts[i];
+                    // Try to destroy the chart instance if it exists
+                    if (chartToRemove._apexcharts) {
+                        try {
+                            chartToRemove._apexcharts.destroy();
+                        } catch (e) {
+                            console.warn('Error destroying duplicate chart:', e);
+                        }
+                    }
+                    chartToRemove.parentNode.remove();
+                }
+                // Also remove any duplicate SVG elements
+                const svgElements = pageviewsElement.querySelectorAll('svg');
+                if (svgElements.length > 1) {
+                    for (let i = 1; i < svgElements.length; i++) {
+                        svgElements[i].remove();
+                    }
+                }
+                // Remove any duplicate apexcharts containers
+                const containers = pageviewsElement.querySelectorAll('.apexcharts-inner, .apexcharts-svg');
+                if (containers.length > 2) {
+                    // Keep first two (inner and svg), remove rest
+                    for (let i = 2; i < containers.length; i++) {
+                        containers[i].remove();
+                    }
+                }
             }
         }
     }
     
+    // Run cleanup after charts are initialized (not immediately to avoid interfering)
+    setTimeout(cleanupDuplicateCharts, 1500);
+    setTimeout(cleanupDuplicateCharts, 2500);
+    setTimeout(cleanupDuplicateCharts, 3500);
+    
+    // Also run cleanup when window loads
+    window.addEventListener('load', function() {
+        setTimeout(cleanupDuplicateCharts, 500);
+        setTimeout(cleanupDuplicateCharts, 1500);
+        setTimeout(cleanupDuplicateCharts, 2500);
+    });
+    
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(initSummeryDatePicker, 1500);
+            setTimeout(function() {
+                cleanupDuplicateCharts();
+                initSummeryDatePicker();
+            }, 1500);
         });
     } else {
-        setTimeout(initSummeryDatePicker, 1500);
+        setTimeout(function() {
+            cleanupDuplicateCharts();
+            initSummeryDatePicker();
+        }, 1500);
     }
 })();
 
@@ -1080,6 +1548,889 @@ function getCountForDateRange(data, startDate, endDate) {
         });
     } else {
         setTimeout(initCollectionDatePicker, 1500);
+    }
+})();
+
+// Handle Billing Summary dropdown filter with datepicker
+(function() {
+    let billingDatePicker = null;
+    
+    function initBillingDatePicker() {
+        const dateRangeInput = document.getElementById('billing_date_range');
+        if (!dateRangeInput) {
+            return;
+        }
+        
+        // Find the Billing Summary card
+        const cards = document.querySelectorAll('.card');
+        let billingCard = null;
+        
+        for (let i = 0; i < cards.length; i++) {
+            const title = cards[i].querySelector('.card-title');
+            if (title && title.textContent.trim() === 'Billing Summary') {
+                billingCard = cards[i];
+                break;
+            }
+        }
+        
+        if (!billingCard) {
+            return;
+        }
+        
+        const dropdownBtn = billingCard.querySelector('.dropdown-btn');
+        const dropdownMenu = billingCard.querySelector('.dropdown-menu');
+        
+        // Destroy any existing flatpickr instance
+        if (dateRangeInput._flatpickr) {
+            dateRangeInput._flatpickr.destroy();
+        }
+        
+        // Get clear button
+        const clearBtn = document.getElementById('clear_billing_date');
+        
+        // Initialize flatpickr
+        if (typeof flatpickr !== 'undefined') {
+            billingDatePicker = flatpickr(dateRangeInput, {
+                mode: "range",
+                dateFormat: "Y-m-d",
+                maxDate: "today",
+                onChange: function(selectedDates, dateStr, instance) {
+                    // Show/hide clear button
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                    
+                    if (selectedDates.length === 2) {
+                        const startDate = selectedDates[0];
+                        const endDate = selectedDates[1];
+                        
+                        // Fetch billing counts for the selected date range
+                        fetchBillingCounts(startDate, endDate);
+                    } else if (selectedDates.length === 0) {
+                        // Date cleared, reset to current month
+                        resetBillingCounts();
+                    }
+                },
+                onClose: function(selectedDates, dateStr, instance) {
+                    // Update clear button visibility
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                },
+                onReady: function(selectedDates, dateStr, instance) {
+                    // Prevent closing dropdown when clicking inside datepicker
+                    if (instance.calendarContainer) {
+                        instance.calendarContainer.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                        });
+                    }
+                    
+                    // Update clear button visibility on ready
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Handle clear button click
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (billingDatePicker) {
+                    billingDatePicker.clear();
+                    resetBillingCounts();
+                }
+            });
+        }
+        
+        // Open datepicker when dropdown is opened
+        if (dropdownBtn && dropdownMenu && billingDatePicker) {
+            dropdownBtn.addEventListener('click', function(e) {
+                // Wait for dropdown to be shown, then open datepicker
+                setTimeout(function() {
+                    // Check if dropdown is visible
+                    if (dropdownMenu.classList.contains('show')) {
+                        // Small delay to ensure dropdown is fully rendered
+                        setTimeout(function() {
+                            if (billingDatePicker && !billingDatePicker.isOpen) {
+                                billingDatePicker.open();
+                            }
+                        }, 100);
+                    }
+                }, 100);
+            });
+        }
+        
+        // Prevent dropdown from closing when clicking inside (except on the input)
+        if (dropdownMenu) {
+            dropdownMenu.addEventListener('click', function(e) {
+                // Allow clicks on the input, clear button, and datepicker calendar
+                const isDatepickerElement = e.target.closest('.flatpickr-calendar') || 
+                                          e.target === dateRangeInput || 
+                                          dateRangeInput.contains(e.target) ||
+                                          e.target === clearBtn ||
+                                          e.target.closest('#clear_billing_date');
+                
+                if (!isDatepickerElement) {
+                    e.stopPropagation();
+                }
+            });
+        }
+    }
+    
+    function fetchBillingCounts(startDate, endDate) {
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        fetch('{{ route("dashboard") }}?get_billing_counts=1&start_date=' + startDateStr + '&end_date=' + endDateStr, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Update the counter values
+            updateBillingCounts(data.generatedBills || 0, data.unpaidInvoices || 0, data.paidInvoices || 0);
+        })
+        .catch(error => {
+            console.error('Error fetching billing counts:', error);
+        });
+    }
+    
+    function resetBillingCounts() {
+        // Reset to current month (default values from server)
+        fetch('{{ route("dashboard") }}?get_billing_counts=1', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Update the counter values
+            updateBillingCounts(data.generatedBills || 0, data.unpaidInvoices || 0, data.paidInvoices || 0);
+        })
+        .catch(error => {
+            console.error('Error fetching billing counts:', error);
+        });
+    }
+    
+    function updateBillingCounts(generatedBills, unpaidInvoices, paidInvoices) {
+        // Find billing summary card
+        const billingCard = document.querySelector('.card-title');
+        let billingSummaryCard = null;
+        
+        // Find the card with "Billing Summary" title
+        const cards = document.querySelectorAll('.card');
+        for (let i = 0; i < cards.length; i++) {
+            const title = cards[i].querySelector('.card-title');
+            if (title && title.textContent.trim() === 'Billing Summary') {
+                billingSummaryCard = cards[i];
+                break;
+            }
+        }
+        
+        if (!billingSummaryCard) {
+            return;
+        }
+        
+        // Find each count card within billing summary
+        const countCards = billingSummaryCard.querySelectorAll('.card-border-warning, .card-border-danger, .card-border-success');
+        
+        countCards.forEach(function(card) {
+            const label = card.querySelector('.fs-md');
+            const counter = card.querySelector('.counter-value');
+            
+            if (label && counter) {
+                const labelText = label.textContent.trim();
+                let newValue = 0;
+                
+                if (labelText === 'Generated Bills') {
+                    newValue = generatedBills;
+                } else if (labelText === 'Unpaid Invoices') {
+                    newValue = unpaidInvoices;
+                } else if (labelText === 'Paid Invoices') {
+                    newValue = paidInvoices;
+                }
+                
+                if (newValue !== null) {
+                    counter.setAttribute('data-target', newValue);
+                    counter.textContent = newValue;
+                    // Trigger counter animation if available
+                    if (typeof counterUp !== 'undefined') {
+                        counterUp(counter, {
+                            duration: 1000,
+                            delay: 16
+                        });
+                    }
+                }
+            }
+        });
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initBillingDatePicker, 1500);
+        });
+    } else {
+        setTimeout(initBillingDatePicker, 1500);
+    }
+})();
+
+// Handle Driver Chart dropdown filter with datepicker
+(function() {
+    let driverChartDatePicker = null;
+    var chartGroupbar = "";
+    
+    function initDriverChartDatePicker() {
+        const dateRangeInput = document.getElementById('driver_chart_date_range');
+        if (!dateRangeInput) {
+            return;
+        }
+        
+        // Find the Driver Chart card
+        const cards = document.querySelectorAll('.card');
+        let driverChartCard = null;
+        
+        for (let i = 0; i < cards.length; i++) {
+            const title = cards[i].querySelector('.card-title');
+            if (title && title.textContent.trim() === 'Collection & Dumps Count by Driver') {
+                driverChartCard = cards[i];
+                break;
+            }
+        }
+        
+        if (!driverChartCard) {
+            return;
+        }
+        
+        const dropdownBtn = driverChartCard.querySelector('.dropdown-btn');
+        const dropdownMenu = driverChartCard.querySelector('.dropdown-menu');
+        
+        // Destroy any existing flatpickr instance
+        if (dateRangeInput._flatpickr) {
+            dateRangeInput._flatpickr.destroy();
+        }
+        
+        // Get clear button
+        const clearBtn = document.getElementById('clear_driver_chart_date');
+        
+        // Initialize flatpickr
+        if (typeof flatpickr !== 'undefined') {
+            driverChartDatePicker = flatpickr(dateRangeInput, {
+                mode: "range",
+                dateFormat: "Y-m-d",
+                maxDate: "today",
+                onChange: function(selectedDates, dateStr, instance) {
+                    // Show/hide clear button
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                    
+                    if (selectedDates.length === 2) {
+                        const startDate = selectedDates[0];
+                        const endDate = selectedDates[1];
+                        
+                        // Fetch and update chart data for the selected date range
+                        fetchDriverChartData(startDate, endDate);
+                    } else if (selectedDates.length === 0) {
+                        // Date cleared, reset to current month
+                        resetDriverChart();
+                    }
+                },
+                onClose: function(selectedDates, dateStr, instance) {
+                    // Update clear button visibility
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                },
+                onReady: function(selectedDates, dateStr, instance) {
+                    // Prevent closing dropdown when clicking inside datepicker
+                    if (instance.calendarContainer) {
+                        instance.calendarContainer.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                        });
+                    }
+                    
+                    // Update clear button visibility on ready
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Handle clear button click
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (driverChartDatePicker) {
+                    driverChartDatePicker.clear();
+                    resetDriverChart();
+                }
+            });
+        }
+        
+        // Open datepicker when dropdown is opened
+        if (dropdownBtn && dropdownMenu && driverChartDatePicker) {
+            dropdownBtn.addEventListener('click', function(e) {
+                // Wait for dropdown to be shown, then open datepicker
+                setTimeout(function() {
+                    // Check if dropdown is visible
+                    if (dropdownMenu.classList.contains('show')) {
+                        // Small delay to ensure dropdown is fully rendered
+                        setTimeout(function() {
+                            if (driverChartDatePicker && !driverChartDatePicker.isOpen) {
+                                driverChartDatePicker.open();
+                            }
+                        }, 100);
+                    }
+                }, 100);
+            });
+        }
+        
+        // Prevent dropdown from closing when clicking inside (except on the input)
+        if (dropdownMenu) {
+            dropdownMenu.addEventListener('click', function(e) {
+                // Allow clicks on the input, clear button, and datepicker calendar
+                const isDatepickerElement = e.target.closest('.flatpickr-calendar') || 
+                                          e.target === dateRangeInput || 
+                                          dateRangeInput.contains(e.target) ||
+                                          e.target === clearBtn ||
+                                          e.target.closest('#clear_driver_chart_date');
+                
+                if (!isDatepickerElement) {
+                    e.stopPropagation();
+                }
+            });
+        }
+        
+        // Initialize chart with current month data from server
+        @if(isset($bar_cart))
+        setTimeout(function() {
+            updateDriverChart({
+                drivers: "{{ $bar_cart['drivers'] }}",
+                collections: "{{ $bar_cart['collections'] }}",
+                dumps: "{{ $bar_cart['dumps'] }}"
+            });
+        }, 1000);
+        @else
+        setTimeout(function() {
+            resetDriverChart();
+        }, 500);
+        @endif
+    }
+    
+    function fetchDriverChartData(startDate, endDate) {
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        fetch('{{ route("dashboard") }}?get_driver_chart_data=1&start_date=' + startDateStr + '&end_date=' + endDateStr, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateDriverChart(data);
+        })
+        .catch(error => {
+            console.error('Error fetching driver chart data:', error);
+        });
+    }
+    
+    function resetDriverChart() {
+        // Reset to current month (default values from server)
+        fetch('{{ route("dashboard") }}?get_driver_chart_data=1', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateDriverChart(data);
+        })
+        .catch(error => {
+            console.error('Error fetching driver chart data:', error);
+        });
+    }
+    
+    function updateDriverChart(barCart) {
+        // Wait for DOM and dependencies to be ready
+        function initChart() {
+            var chartElement = document.querySelector("#collection_dump_bar");
+            if (!chartElement) {
+                setTimeout(initChart, 100);
+                return;
+            }
+            
+            // Check if ApexCharts is available
+            if (typeof ApexCharts === 'undefined') {
+                setTimeout(initChart, 200);
+                return;
+            }
+            
+            // Check if getChartColorsArray is available
+            if (typeof getChartColorsArray === 'undefined') {
+                setTimeout(initChart, 200);
+                return;
+            }
+            
+            try {
+                var chartGroupbarColors = "";
+                chartGroupbarColors = getChartColorsArray("collection_dump_bar");
+                if (chartGroupbarColors) {
+                    // Parse the data strings into arrays
+                    var collectionsData = barCart.collections ? barCart.collections.split(',').map(function(item) {
+                        return parseInt(item.trim()) || 0;
+                    }) : [];
+                    var dumpsData = barCart.dumps ? barCart.dumps.split(',').map(function(item) {
+                        return parseInt(item.trim()) || 0;
+                    }) : [];
+                    var driversCategories = barCart.drivers ? barCart.drivers.split(',').map(function(item) {
+                        return item.trim().replace(/"/g, '');
+                    }) : [];
+                    
+                    var options = {
+                        series: [{
+                            name: "Collection Count",
+                            data: collectionsData
+                        }, {
+                            name: "Dumps Count",
+                            data: dumpsData
+                        }],
+                        chart: {
+                            type: 'bar',
+                            height: 410,
+                            toolbar: {
+                                show: false,
+                            }
+                        },
+                        plotOptions: {
+                            bar: {
+                                horizontal: false,
+                                dataLabels: {
+                                    position: 'top',
+                                },
+                            }
+                        },
+                        dataLabels: {
+                            enabled: true,
+                            offsetX: -6,
+                            style: {
+                                fontSize: '12px',
+                                colors: ['#fff']
+                            }
+                        },
+                        grid: {
+                            padding: {
+                                bottom: -14,
+                                left: 0,
+                                right: 0
+                            }
+                        },
+                        stroke: {
+                            show: true,
+                            width: 1,
+                            colors: ['#fff']
+                        },
+                        tooltip: {
+                            shared: true,
+                            intersect: false
+                        },
+                        xaxis: {
+                            categories: driversCategories,
+                        },
+                        colors: chartGroupbarColors
+                    };
+
+                    // Ensure chartGroupbar is declared globally
+                    if (typeof chartGroupbar === 'undefined') {
+                        window.chartGroupbar = "";
+                    }
+                    
+                    if (window.chartGroupbar && window.chartGroupbar !== "") {
+                        window.chartGroupbar.destroy();
+                    }
+                    
+                    window.chartGroupbar = new ApexCharts(chartElement, options);
+                    window.chartGroupbar.render();
+                }
+            } catch (e) {
+                console.error("Error initializing driver chart:", e);
+            }
+        }
+        
+        // Start initialization
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(initChart, 100);
+            });
+        } else {
+            setTimeout(initChart, 100);
+        }
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initDriverChartDatePicker, 1500);
+        });
+    } else {
+        setTimeout(initDriverChartDatePicker, 1500);
+    }
+})();
+
+// Handle Billing Chart dropdown filter with datepicker
+(function() {
+    let billingChartDatePicker = null;
+    var billingChartGroupbar = "";
+    
+    function initBillingChartDatePicker() {
+        const dateRangeInput = document.getElementById('billing_chart_date_range');
+        if (!dateRangeInput) {
+            return;
+        }
+        
+        // Find the Billing Chart card
+        const cards = document.querySelectorAll('.card');
+        let billingChartCard = null;
+        
+        for (let i = 0; i < cards.length; i++) {
+            const title = cards[i].querySelector('.card-title');
+            if (title && title.textContent.trim() === 'Billing Summary') {
+                billingChartCard = cards[i];
+                break;
+            }
+        }
+        
+        if (!billingChartCard) {
+            return;
+        }
+        
+        const dropdownBtn = billingChartCard.querySelector('.dropdown-btn');
+        const dropdownMenu = billingChartCard.querySelector('.dropdown-menu');
+        
+        // Destroy any existing flatpickr instance
+        if (dateRangeInput._flatpickr) {
+            dateRangeInput._flatpickr.destroy();
+        }
+        
+        // Get clear button
+        const clearBtn = document.getElementById('clear_billing_chart_date');
+        
+        // Initialize flatpickr
+        if (typeof flatpickr !== 'undefined') {
+            billingChartDatePicker = flatpickr(dateRangeInput, {
+                mode: "range",
+                dateFormat: "Y-m-d",
+                maxDate: "today",
+                onChange: function(selectedDates, dateStr, instance) {
+                    // Show/hide clear button
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                    
+                    if (selectedDates.length === 2) {
+                        const startDate = selectedDates[0];
+                        const endDate = selectedDates[1];
+                        
+                        // Fetch and update chart data for the selected date range
+                        fetchBillingChartData(startDate, endDate);
+                    } else if (selectedDates.length === 0) {
+                        // Date cleared, reset to current month
+                        resetBillingChart();
+                    }
+                },
+                onClose: function(selectedDates, dateStr, instance) {
+                    // Update clear button visibility
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                },
+                onReady: function(selectedDates, dateStr, instance) {
+                    // Prevent closing dropdown when clicking inside datepicker
+                    if (instance.calendarContainer) {
+                        instance.calendarContainer.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                        });
+                    }
+                    
+                    // Update clear button visibility on ready
+                    if (clearBtn) {
+                        if (selectedDates.length === 2 && dateStr) {
+                            clearBtn.style.display = 'block';
+                        } else {
+                            clearBtn.style.display = 'none';
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Handle clear button click
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (billingChartDatePicker) {
+                    billingChartDatePicker.clear();
+                    resetBillingChart();
+                }
+            });
+        }
+        
+        // Open datepicker when dropdown is opened
+        if (dropdownBtn && dropdownMenu && billingChartDatePicker) {
+            dropdownBtn.addEventListener('click', function(e) {
+                // Wait for dropdown to be shown, then open datepicker
+                setTimeout(function() {
+                    // Check if dropdown is visible
+                    if (dropdownMenu.classList.contains('show')) {
+                        // Small delay to ensure dropdown is fully rendered
+                        setTimeout(function() {
+                            if (billingChartDatePicker && !billingChartDatePicker.isOpen) {
+                                billingChartDatePicker.open();
+                            }
+                        }, 100);
+                    }
+                }, 100);
+            });
+        }
+        
+        // Prevent dropdown from closing when clicking inside (except on the input)
+        if (dropdownMenu) {
+            dropdownMenu.addEventListener('click', function(e) {
+                // Allow clicks on the input, clear button, and datepicker calendar
+                const isDatepickerElement = e.target.closest('.flatpickr-calendar') || 
+                                          e.target === dateRangeInput || 
+                                          dateRangeInput.contains(e.target) ||
+                                          e.target === clearBtn ||
+                                          e.target.closest('#clear_billing_chart_date');
+                
+                if (!isDatepickerElement) {
+                    e.stopPropagation();
+                }
+            });
+        }
+        
+        // Initialize chart with current month data from server
+        @if(isset($generatedBills) && isset($unpaidInvoices) && isset($paidInvoices))
+        setTimeout(function() {
+            updateBillingChart({
+                generatedBills: {{ $generatedBills ?? 0 }},
+                unpaidInvoices: {{ $unpaidInvoices ?? 0 }},
+                paidInvoices: {{ $paidInvoices ?? 0 }}
+            });
+        }, 1000);
+        @else
+        setTimeout(function() {
+            resetBillingChart();
+        }, 500);
+        @endif
+    }
+    
+    function fetchBillingChartData(startDate, endDate) {
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        fetch('{{ route("dashboard") }}?get_billing_counts=1&start_date=' + startDateStr + '&end_date=' + endDateStr, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateBillingChart(data);
+        })
+        .catch(error => {
+            console.error('Error fetching billing chart data:', error);
+        });
+    }
+    
+    function resetBillingChart() {
+        // Reset to current month (default values from server)
+        fetch('{{ route("dashboard") }}?get_billing_counts=1', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateBillingChart(data);
+        })
+        .catch(error => {
+            console.error('Error fetching billing chart data:', error);
+        });
+    }
+    
+    function updateBillingChart(billingData) {
+        // Wait for DOM and dependencies to be ready
+        function initChart() {
+            var chartElement = document.querySelector("#billing_summary_bar");
+            if (!chartElement) {
+                setTimeout(initChart, 100);
+                return;
+            }
+            
+            // Check if ApexCharts is available
+            if (typeof ApexCharts === 'undefined') {
+                setTimeout(initChart, 200);
+                return;
+            }
+            
+            // Check if getChartColorsArray is available
+            if (typeof getChartColorsArray === 'undefined') {
+                setTimeout(initChart, 200);
+                return;
+            }
+            
+            try {
+                var chartGroupbarColors = "";
+                chartGroupbarColors = getChartColorsArray("billing_summary_bar");
+                if (chartGroupbarColors) {
+                    var options = {
+                        series: [{
+                            name: "Billing Count",
+                            data: [
+                                billingData.generatedBills || 0,
+                                billingData.unpaidInvoices || 0,
+                                billingData.paidInvoices || 0
+                            ]
+                        }],
+                        chart: {
+                            type: 'bar',
+                            height: 410,
+                            toolbar: {
+                                show: false,
+                            }
+                        },
+                        plotOptions: {
+                            bar: {
+                                horizontal: false,
+                                dataLabels: {
+                                    position: 'top',
+                                },
+                                distributed: true, // This makes each bar use a different color
+                            }
+                        },
+                        dataLabels: {
+                            enabled: true,
+                            offsetX: -6,
+                            style: {
+                                fontSize: '12px',
+                                colors: ['#fff']
+                            }
+                        },
+                        grid: {
+                            padding: {
+                                bottom: -14,
+                                left: 0,
+                                right: 0
+                            }
+                        },
+                        stroke: {
+                            show: true,
+                            width: 1,
+                            colors: ['#fff']
+                        },
+                        tooltip: {
+                            shared: false,
+                            intersect: true
+                        },
+                        xaxis: {
+                            categories: ['Generated Bills', 'Unpaid Invoices', 'Paid Invoices'],
+                        },
+                        colors: chartGroupbarColors
+                    };
+
+                    // Ensure billingChartGroupbar is declared globally
+                    if (typeof billingChartGroupbar === 'undefined') {
+                        window.billingChartGroupbar = "";
+                    }
+                    
+                    if (window.billingChartGroupbar && window.billingChartGroupbar !== "") {
+                        window.billingChartGroupbar.destroy();
+                    }
+                    
+                    window.billingChartGroupbar = new ApexCharts(chartElement, options);
+                    window.billingChartGroupbar.render();
+                }
+            } catch (e) {
+                console.error("Error initializing billing chart:", e);
+            }
+        }
+        
+        // Start initialization
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(initChart, 100);
+            });
+        } else {
+            setTimeout(initChart, 100);
+        }
+    }
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initBillingChartDatePicker, 1500);
+        });
+    } else {
+        setTimeout(initBillingChartDatePicker, 1500);
     }
 })();
 </script>
