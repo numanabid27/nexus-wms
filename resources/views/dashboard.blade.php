@@ -2476,19 +2476,15 @@ function getCountForDateRange(data, startDate, endDate) {
             });
         }
         
-        // Initialize chart with current month data from server
+        // Initialize chart with current month data from server immediately
         @if(isset($generatedBills) && isset($unpaidInvoices) && isset($paidInvoices))
-        setTimeout(function() {
-            updateBillingChart({
-                generatedBills: {{ $generatedBills ?? 0 }},
-                unpaidInvoices: {{ $unpaidInvoices ?? 0 }},
-                paidInvoices: {{ $paidInvoices ?? 0 }}
-            });
-        }, 1000);
+        updateBillingChart({
+            generatedBills: {{ $generatedBills ?? 0 }},
+            unpaidInvoices: {{ $unpaidInvoices ?? 0 }},
+            paidInvoices: {{ $paidInvoices ?? 0 }}
+        });
         @else
-        setTimeout(function() {
-            resetBillingChart();
-        }, 500);
+        resetBillingChart();
         @endif
     }
     
@@ -2533,23 +2529,23 @@ function getCountForDateRange(data, startDate, endDate) {
     }
     
     function updateBillingChart(billingData) {
-        // Wait for DOM and dependencies to be ready
+        // Optimized initialization - check dependencies and start immediately
         function initChart() {
             var chartElement = document.querySelector("#billing_summary_bar");
             if (!chartElement) {
-                setTimeout(initChart, 100);
+                requestAnimationFrame(initChart);
                 return;
             }
             
             // Check if ApexCharts is available
             if (typeof ApexCharts === 'undefined') {
-                setTimeout(initChart, 200);
+                requestAnimationFrame(initChart);
                 return;
             }
             
             // Check if getChartColorsArray is available
             if (typeof getChartColorsArray === 'undefined') {
-                setTimeout(initChart, 200);
+                requestAnimationFrame(initChart);
                 return;
             }
             
@@ -2571,6 +2567,11 @@ function getCountForDateRange(data, startDate, endDate) {
                             height: 410,
                             toolbar: {
                                 show: false,
+                            },
+                            animations: {
+                                enabled: true,
+                                easing: 'easeinout',
+                                speed: 800
                             }
                         },
                         plotOptions: {
@@ -2629,23 +2630,25 @@ function getCountForDateRange(data, startDate, endDate) {
             }
         }
         
-        // Start initialization
+        // Start initialization immediately - use requestAnimationFrame for better performance
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(initChart, 100);
+                initChart();
             });
         } else {
-            setTimeout(initChart, 100);
+            // DOM already ready, start immediately
+            initChart();
         }
     }
     
-    // Initialize when DOM is ready
+    // Initialize immediately when DOM is ready - no delay needed
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(initBillingChartDatePicker, 1500);
+            initBillingChartDatePicker();
         });
     } else {
-        setTimeout(initBillingChartDatePicker, 1500);
+        // DOM already ready, initialize immediately
+        initBillingChartDatePicker();
     }
 })();
 </script>
